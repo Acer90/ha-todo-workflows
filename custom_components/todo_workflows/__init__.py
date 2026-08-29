@@ -306,7 +306,17 @@ def _get_items_from_entity(hass: HomeAssistant, entity_id: str) -> list[dict[str
     entity = todo_component.get_entity(entity_id) if todo_component else None
     todo_items = getattr(entity, "todo_items", None)
     if todo_items is None:
+        _LOGGER.warning(
+            "Todo Workflows diagnostics: todo_component=%s entity=%s todo_items=unavailable",
+            todo_component is not None,
+            entity is not None,
+        )
         return None
+    _LOGGER.warning(
+        "Todo Workflows diagnostics: reading %d item(s) from %s",
+        len(todo_items),
+        entity_id,
+    )
     return [
         {
             "uid": item.uid,
@@ -720,7 +730,12 @@ async def _ws_list_items(hass: HomeAssistant, connection, msg) -> None:
     entity_id = DEFAULT_TODO_ENTITY_ID
     items = await _get_items(hass, entity_id)
     await _cleanup_completed_items(hass, entity_id, items)
-    connection.send_result(msg["id"], {"items": _normalize_items(items)})
+    normalized_items = _normalize_items(items)
+    _LOGGER.warning(
+        "Todo Workflows diagnostics: list_items returns %d item(s)",
+        len(normalized_items),
+    )
+    connection.send_result(msg["id"], {"items": normalized_items})
 
 
 def _register_services(hass: HomeAssistant) -> None:
