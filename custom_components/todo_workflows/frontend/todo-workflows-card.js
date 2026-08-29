@@ -1,7 +1,6 @@
-const TODO_WORKFLOWS_CARD_VERSION = "1.0.29";
+const TODO_WORKFLOWS_CARD_VERSION = "1.0.30";
 const TODO_WORKFLOWS_FULL_RELOAD_MS = 5 * 60 * 1000;
 const TODO_WORKFLOWS_FETCH_COOLDOWN_MS = 200;
-const TODO_WORKFLOWS_POST_ACTION_REFRESH_DELAYS_MS = [150, 600];
 console.info("TodoWorkflowsCard v3 loaded", TODO_WORKFLOWS_CARD_VERSION);
 
 class TodoWorkflowsCard extends HTMLElement {
@@ -15,7 +14,8 @@ class TodoWorkflowsCard extends HTMLElement {
     this._lastFetch = 0;
     this._fetchPromise = null;
     this._pendingUpdateTimer = null;
-    this._postActionRefreshTimers = [];
+    this._unsubscribeItems = null;
+    this._subscriptionHass = null;
     this._formOpen = false;
     this._lastRenderSignature = null;
     this._lastFullReloadAt = 0;
@@ -60,8 +60,11 @@ class TodoWorkflowsCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    this._subscribeToItemUpdates();
     const forceFullReload = this._shouldForceFullReload();
-    this._update(forceFullReload);
+    if (forceFullReload || !this._lastFetch) {
+      this._update(true);
+    }
   }
 
   getCardSize() {
@@ -73,7 +76,7 @@ class TodoWorkflowsCard extends HTMLElement {
       clearTimeout(this._pendingUpdateTimer);
       this._pendingUpdateTimer = null;
     }
-    this._clearPostActionRefreshTimers();
+    this._unsubscribeFromItemUpdates();
   }
 
   _initialize() {
@@ -629,8 +632,7 @@ class TodoWorkflowsCard extends HTMLElement {
     this._formValues.resolved_text = "";
     this._formValues.persistent = false;
 
-    await this._fetchItems(true);
-    this._render();
+    this._render(true);
   }
 
   async _completeItem(item) {
@@ -660,9 +662,7 @@ class TodoWorkflowsCard extends HTMLElement {
       return;
     }
 
-    await this._fetchItems(true);
     this._render(true);
-    this._schedulePostActionRefresh();
   }
 
   _applyOptimisticCompletion(item) {
@@ -696,21 +696,6 @@ class TodoWorkflowsCard extends HTMLElement {
       return String(left.ident) === String(right.ident);
     }
     return String(left.title || "") === String(right.title || "");
-  }
-
-  _schedulePostActionRefresh() {
-    this._clearPostActionRefreshTimers();
-    this._postActionRefreshTimers = TODO_WORKFLOWS_POST_ACTION_REFRESH_DELAYS_MS.map((delay) =>
-      setTimeout(async () => {
-        await this._fetchItems(true);
-        this._render(true);
-      }, delay)
-    );
-  }
-
-  _clearPostActionRefreshTimers() {
-    this._postActionRefreshTimers.forEach((timer) => clearTimeout(timer));
-    this._postActionRefreshTimers = [];
   }
 
   async _update(force = false) {
@@ -777,6 +762,50 @@ class TodoWorkflowsCard extends HTMLElement {
       });
 
     await this._fetchPromise;
+  }
+
+  _subscribeToItemUpdates() {
+    if (!this._hass?.connection || this._subscriptionHass === this._hass) {
+      return;
+    }
+    this._unsubscribeFromItemUpdates();
+    this._subscriptionHass = this._hass;
+    this._hass.connection
+      .subscribeMessage(
+        (message) => {
+          const items = message?.event?.items;
+          if (!Array.isArray(items)) {
+            return;
+          }
+          this._error = null;
+          this._setItems(items);
+          this._render(true);
+        },
+        { type: "todo_workflows/subscribe_items" }
+      )
+      .then((unsubscribe) => {
+        if (this._subscriptionHass === this._hass) {
+          this._unsubscribeItems = unsubscribe;
+        } else {
+          unsubscribe();
+        }
+      })
+      .catch((error) => {
+        if (this._subscriptionHass === this._hass) {
+          console.debug(
+            "Todo Workflows live updates are unavailable; using list refreshes.",
+            error
+          );
+        }
+      });
+  }
+
+  _unsubscribeFromItemUpdates() {
+    if (this._unsubscribeItems) {
+      this._unsubscribeItems();
+      this._unsubscribeItems = null;
+    }
+    this._subscriptionHass = null;
   }
 
   _sortItems(items) {

@@ -87,6 +87,9 @@ SERVICE_COMPLETE_SCHEMA = vol.Schema(
 WS_LIST_ITEMS = {
     vol.Required("type"): "todo_workflows/list_items",
 }
+WS_SUBSCRIBE_ITEMS = {
+    vol.Required("type"): "todo_workflows/subscribe_items",
+}
 
 
 def _extract_item_id(item: dict[str, Any]) -> str | None:
@@ -466,9 +469,11 @@ async def _handle_upsert(call: ServiceCall) -> None:
                     **_due_fields(data.get(ATTR_DUE, "")),
                 },
             )
+        await _publish_items(hass)
         return
 
     await _call_todo_service(hass, "add_item", service_data)
+    await _publish_items(hass)
 
 
 async def _handle_complete(call: ServiceCall) -> None:
@@ -531,6 +536,7 @@ async def _handle_complete(call: ServiceCall) -> None:
                     },
                     target_entity_id=entity_id,
                 )
+                await _publish_items(hass)
             else:
                 await _call_todo_service(
                     hass,
@@ -538,6 +544,7 @@ async def _handle_complete(call: ServiceCall) -> None:
                     {ATTR_ENTITY_ID: entity_id, "item": str(title_hint)},
                     target_entity_id=entity_id,
                 )
+                await _publish_items(hass)
             return
         if item_id:
             _LOGGER.warning(
@@ -603,6 +610,7 @@ async def _handle_complete(call: ServiceCall) -> None:
             {ATTR_ENTITY_ID: entity_id, "item": item_title},
             target_entity_id=entity_id,
         )
+    await _publish_items(hass)
 
 
 async def _cleanup_completed_items(
@@ -629,28 +637,9 @@ async def _cleanup_completed_items(
         )
 
 
-async def _handle_complete_v2(call: ServiceCall) -> None:
-    await _handle_complete(call)
-
-
-async def _handle_reload(call: ServiceCall) -> None:
-    """Reload the Todo Workflows config entry."""
-    entries = call.hass.config_entries.async_entries(DOMAIN)
-    if not entries:
-        _LOGGER.warning("Todo Workflows kann nicht neu geladen werden: kein Config-Entry")
-        return
-
-    await call.hass.config_entries.async_reload(entries[0].entry_id)
-
-
-@websocket_api.websocket_command(WS_LIST_ITEMS)
-@websocket_api.async_response
-async def _ws_list_items(hass: HomeAssistant, connection, msg) -> None:
-    entity_id = DEFAULT_TODO_ENTITY_ID
-    items = await _get_items(hass, entity_id)
-    await _cleanup_completed_items(hass, entity_id, items)
+def _normalize_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert stored Todo items to the card's public data structure."""
     normalized = []
-
     for item in items:
         description = _extract_item_description(item)
         data = _parse_description_json(description) or {}
@@ -676,8 +665,55 @@ async def _ws_list_items(hass: HomeAssistant, connection, msg) -> None:
                 "completed_at": data.get("completed_at", ""),
             }
         )
+    return normalized
 
-    connection.send_result(msg["id"], {"items": normalized})
+
+async def _publish_items(hass: HomeAssistant) -> None:
+    """Publish the current list to all Todo Workflows card subscribers."""
+    items = await _get_items(hass, DEFAULT_TODO_ENTITY_ID)
+    for connection, message_id in hass.data.get(f"{DOMAIN}_subscribers", []):
+        connection.send_message(
+            websocket_api.event_message(message_id, {"items": _normalize_items(items)})
+        )
+
+
+async def _handle_complete_v2(call: ServiceCall) -> None:
+    await _handle_complete(call)
+
+
+async def _handle_reload(call: ServiceCall) -> None:
+    """Reload the Todo Workflows config entry."""
+    entries = call.hass.config_entries.async_entries(DOMAIN)
+    if not entries:
+        _LOGGER.warning("Todo Workflows kann nicht neu geladen werden: kein Config-Entry")
+        return
+
+    await call.hass.config_entries.async_reload(entries[0].entry_id)
+
+
+@websocket_api.websocket_command(WS_LIST_ITEMS)
+@websocket_api.async_response
+async def _ws_list_items(hass: HomeAssistant, connection, msg) -> None:
+    entity_id = DEFAULT_TODO_ENTITY_ID
+    items = await _get_items(hass, entity_id)
+    await _cleanup_completed_items(hass, entity_id, items)
+    connection.send_result(msg["id"], {"items": _normalize_items(items)})
+
+
+@websocket_api.websocket_command(WS_SUBSCRIBE_ITEMS)
+@websocket_api.async_response
+async def _ws_subscribe_items(hass: HomeAssistant, connection, msg) -> None:
+    """Subscribe a card to Todo Workflows item updates."""
+    subscribers = hass.data.setdefault(f"{DOMAIN}_subscribers", [])
+    subscriber = (connection, msg["id"])
+    subscribers.append(subscriber)
+
+    def unsubscribe() -> None:
+        if subscriber in subscribers:
+            subscribers.remove(subscriber)
+
+    connection.subscriptions[msg["id"]] = unsubscribe
+    connection.send_result(msg["id"])
 
 
 def _register_services(hass: HomeAssistant) -> None:
@@ -708,6 +744,7 @@ def _register_services(hass: HomeAssistant) -> None:
         schema=vol.Schema({}),
     )
     websocket_api.async_register_command(hass, _ws_list_items)
+    websocket_api.async_register_command(hass, _ws_subscribe_items)
     hass.data[DATA_SERVICES_REGISTERED] = True
 
 
