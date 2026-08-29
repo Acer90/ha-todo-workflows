@@ -1,7 +1,7 @@
 {
     "domain":  "todo_workflows",
     "name":  "Todo Workflows",
-    "version":  "1.0.17",
+    "version":  "1.0.18",
     "documentation":  "https://example.local/todo_workflows",
     "config_flow":  true,
     "dependencies":  [

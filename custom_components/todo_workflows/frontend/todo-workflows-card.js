@@ -1,7 +1,6 @@
-const TODO_WORKFLOWS_CARD_VERSION = "1.0.31";
+const TODO_WORKFLOWS_CARD_VERSION = "1.0.32";
 const TODO_WORKFLOWS_FULL_RELOAD_MS = 5 * 60 * 1000;
 const TODO_WORKFLOWS_FETCH_COOLDOWN_MS = 200;
-const TODO_WORKFLOWS_DEBUG = true;
 console.info("TodoWorkflowsCard v3 loaded", TODO_WORKFLOWS_CARD_VERSION);
 
 class TodoWorkflowsCard extends HTMLElement {
@@ -56,13 +55,11 @@ class TodoWorkflowsCard extends HTMLElement {
       add_button_label: "Add",
       ...cardConfig,
     };
-    this._debug("configuration received", this._config);
     this._initialize();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._debug("Home Assistant connection received", Boolean(hass?.connection));
     this._subscribeToItemUpdates();
     const forceFullReload = this._shouldForceFullReload();
     if (forceFullReload || !this._lastFetch) {
@@ -730,10 +727,6 @@ class TodoWorkflowsCard extends HTMLElement {
 
   async _fetchItems(force = false) {
     if (!this._hass || !this._config) {
-      this._debug("list request skipped", {
-        hasHass: Boolean(this._hass),
-        hasConfig: Boolean(this._config),
-      });
       return;
     }
 
@@ -745,7 +738,6 @@ class TodoWorkflowsCard extends HTMLElement {
     this._loading = true;
     this._error = null;
     this._lastFetch = Date.now();
-    this._debug("requesting todo_workflows/list_items", { force });
 
     this._fetchPromise = this._hass
       .callWS({
@@ -755,15 +747,12 @@ class TodoWorkflowsCard extends HTMLElement {
         const items =
           result?.items ?? result?.response?.items ?? result?.result?.items;
         if (Array.isArray(items)) {
-          this._debug("list response received", { count: items.length, items });
           this._setItems(items);
           return;
         }
-        this._debug("list response did not contain an items array", result);
         this._setItems([]);
       })
       .catch((err) => {
-        this._debug("list request failed", err);
         this._error = err?.message || String(err);
         this._setItems([]);
       })
@@ -773,12 +762,6 @@ class TodoWorkflowsCard extends HTMLElement {
       });
 
     await this._fetchPromise;
-  }
-
-  _debug(message, details) {
-    if (TODO_WORKFLOWS_DEBUG) {
-      console.info(`[Todo Workflows] ${message}`, details ?? "");
-    }
   }
 
   _subscribeToItemUpdates() {
