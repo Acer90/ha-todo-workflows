@@ -666,12 +666,20 @@ def _register_services(hass: HomeAssistant) -> None:
 async def _register_frontend(hass: HomeAssistant) -> None:
     if hass.data.get(DATA_FRONTEND_REGISTERED):
         return
+    if not getattr(hass, "http", None):
+        _LOGGER.warning("HTTP-Komponente noch nicht bereit, Todo-Workflows-Card wird nicht registriert")
+        return
     file_path = os.path.join(os.path.dirname(__file__), "frontend", "todo-workflows-card.js")
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL, file_path, False)]
-    )
-    add_extra_js_url(hass, CARD_URL)
+    try:
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(CARD_URL, file_path, False)]
+        )
+        add_extra_js_url(hass, CARD_URL)
+    except Exception:
+        _LOGGER.exception("Registrieren der Todo-Workflows-Card ist fehlgeschlagen")
+        return
     hass.data[DATA_FRONTEND_REGISTERED] = True
+    _LOGGER.debug("Todo-Workflows-Card registriert unter %s", CARD_URL)
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
