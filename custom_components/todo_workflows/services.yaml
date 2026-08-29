@@ -1,0 +1,132 @@
+upsert_item:
+  name: Upsert todo item
+  description: Create or update a todo item identified by its title stored as ident in the description JSON.
+  fields:
+    entity_id:
+      name: Todo list entity
+      description: The todo list entity.
+      required: true
+      selector:
+        entity:
+          domain: todo
+    ident:
+      name: Ident
+      description: Optional override. If omitted, the title is used as ident.
+      required: false
+      selector:
+        text:
+    title:
+      name: Title
+      description: Title of the task.
+      required: true
+      selector:
+        text:
+    description:
+      name: Short description
+      description: Short description displayed in the card.
+      required: false
+      selector:
+        text:
+    due:
+      name: Due date
+      description: Due date or datetime (ISO format).
+      required: false
+      selector:
+        text:
+    priority:
+      name: Priority
+      description: Priority used for sorting (lower = higher priority).
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10
+          step: 1
+          mode: box
+    icon:
+      name: Icon
+      description: MDI icon (e.g. mdi:car).
+      required: false
+      selector:
+        icon:
+    color:
+      name: Color
+      description: Hex color for the icon background.
+      required: false
+      selector:
+        text:
+    second_color:
+      name: Second color
+      description: Optional second hex color for a gradient task background.
+      required: false
+      selector:
+        text:
+    icon_background_color:
+      name: Icon background color
+      description: Optional hex color for the icon circle background.
+      required: false
+      selector:
+        text:
+    icon_color:
+      name: Icon color
+      description: Optional hex color for the icon itself.
+      required: false
+      selector:
+        text:
+    text_color:
+      name: Text color
+      description: Hex color for the task text. Defaults to black when not set in the card.
+      required: false
+      selector:
+        text:
+    persistent:
+      name: Persistent
+      description: Keep item when completed (mark as done instead of deleting).
+      required: false
+      selector:
+        boolean:
+    resolved_text:
+      name: Resolved text
+      description: Text to show when persistent items are completed.
+      required: false
+      selector:
+        text:
+    cleanup_hours:
+      name: Cleanup hours
+      description: Auto-delete persistent completed tasks after N hours (0 = keep).
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 9999
+          step: 1
+          mode: box
+complete_item_v2:
+  name: Complete todo item (v2)
+  description: Same as complete_item, tolerant schema.
+  fields:
+    entity_id:
+      name: Todo list entity
+      description: The todo list entity.
+      required: true
+      selector:
+        entity:
+          domain: todo
+    ident:
+      name: Ident
+      description: Optional override. If omitted, the title is used as ident.
+      required: false
+      selector:
+        text:
+    title:
+      name: Title
+      description: Title of the task. Used as ident when ident is omitted.
+      required: false
+      selector:
+        text:
+    persistent:
+      name: Persistent override
+      description: If true, mark item completed instead of deleting.
+      required: false
+      selector:
+        boolean:
