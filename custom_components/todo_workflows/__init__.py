@@ -796,9 +796,6 @@ async def _register_frontend(hass: HomeAssistant) -> None:
 
 async def _register_lovelace_resource(hass: HomeAssistant) -> None:
     """Add the card as a persistent Lovelace resource when storage mode is used."""
-    if hass.data.get(DATA_LOVELACE_RESOURCE_REGISTERED):
-        return
-
     integration = await async_get_integration(hass, DOMAIN)
     card_resource_url = f"{CARD_URL}?v={integration.version}"
 
@@ -861,4 +858,7 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
     """Unload the Todo Workflows config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        hass.data.pop(DATA_LOVELACE_RESOURCE_REGISTERED, None)
+    return unloaded

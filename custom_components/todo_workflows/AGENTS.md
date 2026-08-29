@@ -68,7 +68,7 @@ WebSocket Command:
 - type: todo_workflows/subscribe_items
 
 Lovelace-Resource:
-- Die Card wird in Lovelace Storage Mode automatisch als `module`-Resource unter `/todo_workflows_frontend/todo-workflows-card.js?v={manifest_version}` angelegt und bei Versionswechsel aktualisiert. Die Version kommt dynamisch aus dem geladenen Integrations-Manifest und folgt damit dem Publish-Skript.
+- Die Card wird in Lovelace Storage Mode automatisch als `module`-Resource unter `/todo_workflows_frontend/todo-workflows-card.js?v={manifest_version}` angelegt und bei jedem Config-Entry-Setup auf die aktuelle Version aktualisiert. Die Version kommt dynamisch aus dem geladenen Integrations-Manifest und folgt damit dem Publish-Skript.
 - Die Lovelace-Collection erwartet beim Anlegen/Aktualisieren `res_type: module`; gespeichert wird die Resource danach als `type: module`.
 - Im YAML-Resource-Mode muss die Resource in `configuration.yaml` gepflegt werden; die Integration schreibt YAML nicht um.
 
@@ -151,6 +151,7 @@ Pflegepflicht:
 - Condition-Checks laufen synchron und mussen deshalb auf vorhandene States zugreifen statt Service-Calls.
 - Browser-Cache kann alte Card-Versionen halten (bei JS-Anderungen mit Versionsbump arbeiten).
 - Lovelace Resources koennen im YAML-Modus nicht von der Integration persistiert angelegt werden.
+- Nach einem HACS-Update ist `todo_workflows.reload` erforderlich, damit der Resource-Eintrag seine neue `?v=`-Version erhaelt.
 - Card und Integration konnen asynchron unterschiedliche Datenstande sehen; post-action refresh ist daher gewollt.
 - Die Standardliste wird per Home-Assistant-Store persistiert; sie darf nicht durch fluchtigen Entity-State ersetzt werden.
 
