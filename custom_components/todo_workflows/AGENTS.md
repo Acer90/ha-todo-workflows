@@ -147,6 +147,7 @@ Pflegepflicht:
 - description enthalt kein valides JSON, daher immer defensiv parsen.
 - todo.get_items kann je nach HA-Version unterschiedlich verschachtelte Antwortstrukturen liefern.
 - Die aktuelle Todo-Service-Antwort ist nach Entity-ID verschachtelt (`response["todo.todo_workflows"]["items"]`); flache und Legacy-Formen bleiben ebenfalls unterstuetzt.
+- Fuer die interne Liste liest die Integration Items direkt aus der registrierten Todo-Entity. Das vermeidet Unterschiede zwischen Home-Assistant-Versionen bei `todo.get_items`-Responses und entspricht dem Bestand der nativen Todo-Ansicht.
 - Condition-Checks laufen synchron und mussen deshalb auf vorhandene States zugreifen statt Service-Calls.
 - Browser-Cache kann alte Card-Versionen halten (bei JS-Anderungen mit Versionsbump arbeiten).
 - Lovelace Resources koennen im YAML-Modus nicht von der Integration persistiert angelegt werden.

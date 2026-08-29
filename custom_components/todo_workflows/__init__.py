@@ -301,9 +301,32 @@ def _extract_tasks_from_state(state) -> list[dict[str, Any]]:
     return tasks
 
 
+def _get_items_from_entity(hass: HomeAssistant, entity_id: str) -> list[dict[str, Any]] | None:
+    """Read items directly from a registered Todo entity when available."""
+    todo_component = hass.data.get("todo")
+    entity = todo_component.get_entity(entity_id) if todo_component else None
+    todo_items = getattr(entity, "todo_items", None)
+    if todo_items is None:
+        return None
+    return [
+        {
+            "uid": item.uid,
+            "summary": item.summary,
+            "status": item.status.value if item.status else None,
+            "description": item.description,
+        }
+        for item in todo_items
+    ]
+
+
 async def _get_items(
     hass: HomeAssistant, entity_id: str, items_entity: str | None = None
 ) -> list[dict[str, Any]]:
+    if entity_id == DEFAULT_TODO_ENTITY_ID:
+        items = _get_items_from_entity(hass, entity_id)
+        if items is not None:
+            return items
+
     if not hass.states.get(entity_id):
         _LOGGER.debug("Todo-Speicher ist noch nicht verfuegbar: %s", entity_id)
         return []
