@@ -87,9 +87,7 @@ SERVICE_COMPLETE_SCHEMA = vol.Schema(
 WS_LIST_ITEMS = {
     vol.Required("type"): "todo_workflows/list_items",
 }
-WS_SUBSCRIBE_ITEMS = {
-    vol.Required("type"): "todo_workflows/subscribe_items",
-}
+EVENT_ITEMS_UPDATED = f"{DOMAIN}_items_updated"
 
 
 def _extract_item_id(item: dict[str, Any]) -> str | None:
@@ -697,12 +695,8 @@ def _normalize_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 async def _publish_items(hass: HomeAssistant) -> None:
-    """Publish the current list to all Todo Workflows card subscribers."""
-    items = await _get_items(hass, DEFAULT_TODO_ENTITY_ID)
-    for connection, message_id in hass.data.get(f"{DOMAIN}_subscribers", []):
-        connection.send_message(
-            websocket_api.event_message(message_id, {"items": _normalize_items(items)})
-        )
+    """Notify cards that the integration's item list changed."""
+    hass.bus.async_fire(EVENT_ITEMS_UPDATED)
 
 
 async def _handle_complete_v2(call: ServiceCall) -> None:
@@ -726,22 +720,6 @@ async def _ws_list_items(hass: HomeAssistant, connection, msg) -> None:
     items = await _get_items(hass, entity_id)
     await _cleanup_completed_items(hass, entity_id, items)
     connection.send_result(msg["id"], {"items": _normalize_items(items)})
-
-
-@websocket_api.websocket_command(WS_SUBSCRIBE_ITEMS)
-@websocket_api.async_response
-async def _ws_subscribe_items(hass: HomeAssistant, connection, msg) -> None:
-    """Subscribe a card to Todo Workflows item updates."""
-    subscribers = hass.data.setdefault(f"{DOMAIN}_subscribers", [])
-    subscriber = (connection, msg["id"])
-    subscribers.append(subscriber)
-
-    def unsubscribe() -> None:
-        if subscriber in subscribers:
-            subscribers.remove(subscriber)
-
-    connection.subscriptions[msg["id"]] = unsubscribe
-    connection.send_result(msg["id"])
 
 
 def _register_services(hass: HomeAssistant) -> None:
@@ -772,7 +750,6 @@ def _register_services(hass: HomeAssistant) -> None:
         schema=vol.Schema({}),
     )
     websocket_api.async_register_command(hass, _ws_list_items)
-    websocket_api.async_register_command(hass, _ws_subscribe_items)
     hass.data[DATA_SERVICES_REGISTERED] = True
 
 

@@ -65,7 +65,9 @@ Registrierte Condition (Automation/Skript):
 
 WebSocket Command:
 - type: todo_workflows/list_items
-- type: todo_workflows/subscribe_items
+
+Home-Assistant-Event:
+- `todo_workflows_items_updated` wird nach einer Aenderung der internen Liste ausgelost.
 
 Lovelace-Resource:
 - Die Card wird in Lovelace Storage Mode automatisch als `module`-Resource unter `/todo_workflows_frontend/todo-workflows-card.js?v={manifest_version}` angelegt und bei jedem Config-Entry-Setup auf die aktuelle Version aktualisiert. Die Version kommt dynamisch aus dem geladenen Integrations-Manifest und folgt damit dem Publish-Skript.
@@ -92,8 +94,8 @@ Verhalten:
   - ladt Items
   - fuhrt Cleanup (falls fallig) aus
   - liefert normalisierte Struktur fur die Card
-- subscribe_items:
-  - liefert Push-Events mit normalisierten Items nach Anderungen durch Todo-Workflows-Services und raumt Card-Subscriptions beim Trennen auf
+- todo_workflows_items_updated:
+  - benachrichtigt abonnierte Cards nach Anderungen durch Todo-Workflows-Services; die Card laedt die aktuelle Liste danach ueber `list_items` nach
 
 ## 5) Custom Card: Architektur und Verhalten
 
@@ -103,7 +105,7 @@ Datei:
 Kernpunkte:
 - Nutzt Shadow DOM und rendert eine Liste mit Styling pro Item.
 - Laedt Daten ausschliesslich uber callWS mit todo_workflows/list_items.
-- Abonniert `todo_workflows/subscribe_items`, damit Aenderungen ohne Polling direkt gerendert werden.
+- Abonniert das Home-Assistant-Event `todo_workflows_items_updated`, damit Aenderungen ohne Polling ueber `list_items` nachgeladen werden.
 - Sendet Aenderungen ausschliesslich an todo_workflows-Services; die Todo-Liste ist ein internes Speicher-Detail.
 - Unterstutzt optimistische UI beim Abschluss (direkte UI-Reaktion, danach Refresh).
 - Enthalt ein Formular fur neue/aktualisierte Eintrage (Service upsert_item).
@@ -133,7 +135,7 @@ Beim Backend:
 Bei der Card:
 - Keine unnotigen Full-Rebuilds des DOM einfuhren.
 - Optimistische Updates nur nutzen, wenn danach ein Server-Refresh erfolgt.
-- Push-Subscriptions beim Trennen der Card immer abbestellen.
+- Event-Subscriptions beim Trennen der Card immer abbestellen.
 - Farbe/Icon/Text-Kontraste auf Lesbarkeit prufen.
 
 Pflegepflicht:
@@ -166,7 +168,7 @@ Backend:
 - complete_item_v2 markiert persistentes Item als completed.
 - Cleanup entfernt fallige completed/persistent Items.
 - WebSocket list_items liefert erwartete normalisierte Felder.
-- WebSocket subscribe_items liefert nach Upsert und Complete ein Update an abonnierte Cards.
+- Das Event todo_workflows_items_updated wird nach Upsert und Complete ausgeloest.
 - Condition todo_workflows.has_ident liefert true bei vorhandenem ident.
 - Condition todo_workflows.has_ident respektiert optional completed=true/false.
 
@@ -174,7 +176,7 @@ Frontend:
 - Die Card-Resource erscheint nach dem Setup in Dashboard -> Ressourcen als `module` mit einer versionsierten URL, zum Beispiel `/todo_workflows_frontend/todo-workflows-card.js?v=1.0.7`.
 - Add-Form sendet alle Felder korrekt.
 - Completion aktualisiert UI sofort und bleibt nach Refresh konsistent.
-- Aenderungen durch eine andere Todo-Workflows-Aktion aktualisieren die Card per Push-Event.
+- Aenderungen durch eine andere Todo-Workflows-Aktion aktualisieren die Card per Home-Assistant-Event.
 - Sortierung nach priority, dann due, dann title ist stabil.
 - Bei WebSocket-Fehlern zeigt die Card den Fehler und verwendet keine State- oder Sensor-Fallbacks.
 

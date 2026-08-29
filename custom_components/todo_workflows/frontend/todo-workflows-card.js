@@ -1,4 +1,4 @@
-const TODO_WORKFLOWS_CARD_VERSION = "1.0.30";
+const TODO_WORKFLOWS_CARD_VERSION = "1.0.31";
 const TODO_WORKFLOWS_FULL_RELOAD_MS = 5 * 60 * 1000;
 const TODO_WORKFLOWS_FETCH_COOLDOWN_MS = 200;
 console.info("TodoWorkflowsCard v3 loaded", TODO_WORKFLOWS_CARD_VERSION);
@@ -771,17 +771,12 @@ class TodoWorkflowsCard extends HTMLElement {
     this._unsubscribeFromItemUpdates();
     this._subscriptionHass = this._hass;
     this._hass.connection
-      .subscribeMessage(
-        (message) => {
-          const items = message?.event?.items;
-          if (!Array.isArray(items)) {
-            return;
-          }
-          this._error = null;
-          this._setItems(items);
+      .subscribeEvents(
+        async () => {
+          await this._fetchItems(true);
           this._render(true);
         },
-        { type: "todo_workflows/subscribe_items" }
+        "todo_workflows_items_updated"
       )
       .then((unsubscribe) => {
         if (this._subscriptionHass === this._hass) {
