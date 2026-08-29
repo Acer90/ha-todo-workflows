@@ -17,6 +17,7 @@ from homeassistant.components.lovelace.const import LOVELACE_DATA, MODE_STORAGE
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
+from homeassistant.loader import async_get_integration
 
 from .const import (
     ATTR_BADGE,
@@ -48,8 +49,6 @@ DATA_SERVICES_REGISTERED = f"{DOMAIN}_services_registered"
 DATA_FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
 DATA_LOVELACE_RESOURCE_REGISTERED = f"{DOMAIN}_lovelace_resource_registered"
 CARD_URL = "/todo_workflows_frontend/todo-workflows-card.js"
-CARD_VERSION = "1.0.6"
-CARD_RESOURCE_URL = f"{CARD_URL}?v={CARD_VERSION}"
 PLATFORMS = ("todo",)
 
 SERVICE_UPSERT_SCHEMA = vol.Schema(
@@ -718,6 +717,9 @@ async def _register_lovelace_resource(hass: HomeAssistant) -> None:
     if hass.data.get(DATA_LOVELACE_RESOURCE_REGISTERED):
         return
 
+    integration = await async_get_integration(hass, DOMAIN)
+    card_resource_url = f"{CARD_URL}?v={integration.version}"
+
     lovelace_data = hass.data.get(LOVELACE_DATA)
     if not lovelace_data:
         _LOGGER.warning("Lovelace ist nicht bereit, Card-Resource wird nicht angelegt")
@@ -725,7 +727,7 @@ async def _register_lovelace_resource(hass: HomeAssistant) -> None:
     if lovelace_data.resource_mode != MODE_STORAGE:
         _LOGGER.warning(
             "Lovelace-Resources laufen im YAML-Modus; %s muss in configuration.yaml eingetragen werden",
-            CARD_RESOURCE_URL,
+            card_resource_url,
         )
         return
 
@@ -740,21 +742,21 @@ async def _register_lovelace_resource(hass: HomeAssistant) -> None:
         None,
     )
     if existing_resource:
-        if existing_resource.get("url") != CARD_RESOURCE_URL:
+        if existing_resource.get("url") != card_resource_url:
             await resources.async_update_item(
                 existing_resource["id"],
-                {"url": CARD_RESOURCE_URL, "res_type": "module"},
+                {"url": card_resource_url, "res_type": "module"},
             )
             _LOGGER.info(
-                "Todo-Workflows-Card-Resource aktualisiert: %s", CARD_RESOURCE_URL
+                "Todo-Workflows-Card-Resource aktualisiert: %s", card_resource_url
             )
     else:
         await resources.async_create_item(
-            {"url": CARD_RESOURCE_URL, "res_type": "module"}
+            {"url": card_resource_url, "res_type": "module"}
         )
         _LOGGER.info(
             "Todo-Workflows-Card als Lovelace-Resource angelegt: %s",
-            CARD_RESOURCE_URL,
+            card_resource_url,
         )
     hass.data[DATA_LOVELACE_RESOURCE_REGISTERED] = True
 

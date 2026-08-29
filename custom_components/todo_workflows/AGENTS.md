@@ -66,7 +66,7 @@ WebSocket Command:
 - type: todo_workflows/list_items
 
 Lovelace-Resource:
-- Die Card wird in Lovelace Storage Mode automatisch als `module`-Resource unter `/todo_workflows_frontend/todo-workflows-card.js?v={version}` angelegt und bei Versionswechsel aktualisiert.
+- Die Card wird in Lovelace Storage Mode automatisch als `module`-Resource unter `/todo_workflows_frontend/todo-workflows-card.js?v={manifest_version}` angelegt und bei Versionswechsel aktualisiert. Die Version kommt dynamisch aus dem geladenen Integrations-Manifest und folgt damit dem Publish-Skript.
 - Die Lovelace-Collection erwartet beim Anlegen/Aktualisieren `res_type: module`; gespeichert wird die Resource danach als `type: module`.
 - Im YAML-Resource-Mode muss die Resource in `configuration.yaml` gepflegt werden; die Integration schreibt YAML nicht um.
 
@@ -158,7 +158,7 @@ Backend:
 - Condition todo_workflows.has_ident respektiert optional completed=true/false.
 
 Frontend:
-- Die Card-Resource erscheint nach dem Setup in Dashboard -> Ressourcen als `module` mit einer versionsierten URL, zum Beispiel `/todo_workflows_frontend/todo-workflows-card.js?v=1.0.6`.
+- Die Card-Resource erscheint nach dem Setup in Dashboard -> Ressourcen als `module` mit einer versionsierten URL, zum Beispiel `/todo_workflows_frontend/todo-workflows-card.js?v=1.0.7`.
 - Add-Form sendet alle Felder korrekt.
 - Completion aktualisiert UI sofort und bleibt nach Refresh konsistent.
 - Sortierung nach priority, dann due, dann title ist stabil.
