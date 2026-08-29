@@ -56,6 +56,7 @@ Wichtig:
 ## 4) Services, Conditions und WebSocket
 
 Registrierte Services (Domain todo_workflows):
+- reload
 - upsert_item
 - complete_item_v2
 
@@ -71,6 +72,8 @@ Lovelace-Resource:
 - Im YAML-Resource-Mode muss die Resource in `configuration.yaml` gepflegt werden; die Integration schreibt YAML nicht um.
 
 Verhalten:
+- reload:
+  - laedt den Todo-Workflows-Config-Entry neu, einschliesslich der internen Todo-Liste und Lovelace-Resource-Registrierung
 - Die eigene Liste `todo.todo_workflows` ist die persistente Backend-Entity. Die Card kommuniziert ausschliesslich mit `todo_workflows`-Services und dem WebSocket und kennt keine Todo- oder Sensor-Entity.
 - upsert_item:
   - sucht Item per ident/titelnahen Fallbacks
@@ -147,6 +150,7 @@ Pflegepflicht:
 ## 8) Test-Checkliste fur Anderungen
 
 Backend:
+- `todo_workflows.reload` laedt den Config-Entry ohne Home-Assistant-Neustart neu.
 - Nach dem Einrichten des Config-Entries existiert `todo.todo_workflows`; neu angelegte Items bleiben nach einem Home-Assistant-Neustart erhalten.
 - upsert_item erstellt neues Item.
 - upsert_item aktualisiert vorhandenes Item per ident.

@@ -1,3 +1,6 @@
+reload:
+  name: Reload Todo Workflows
+  description: Reload the Todo Workflows integration without restarting Home Assistant.
 upsert_item:
   name: Upsert todo item
   description: Create or update a todo item identified by its title stored as ident in the description JSON.

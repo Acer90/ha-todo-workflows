@@ -3,6 +3,7 @@ DEFAULT_TODO_ENTITY_ID = "todo.todo_workflows"
 SERVICE_UPSERT_ITEM = "upsert_item"
 SERVICE_COMPLETE_ITEM = "complete_item"
 SERVICE_COMPLETE_ITEM_V2 = "complete_item_v2"
+SERVICE_RELOAD = "reload"
 
 ATTR_IDENT = "ident"
 ATTR_TITLE = "title"

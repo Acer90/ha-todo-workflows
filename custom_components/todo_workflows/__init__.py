@@ -40,6 +40,7 @@ from .const import (
     DOMAIN,
     SERVICE_COMPLETE_ITEM,
     SERVICE_COMPLETE_ITEM_V2,
+    SERVICE_RELOAD,
     SERVICE_UPSERT_ITEM,
 )
 
@@ -633,6 +634,16 @@ async def _handle_complete_v2(call: ServiceCall) -> None:
     await _handle_complete(call)
 
 
+async def _handle_reload(call: ServiceCall) -> None:
+    """Reload the Todo Workflows config entry."""
+    entries = call.hass.config_entries.async_entries(DOMAIN)
+    if not entries:
+        _LOGGER.warning("Todo Workflows kann nicht neu geladen werden: kein Config-Entry")
+        return
+
+    await call.hass.config_entries.async_reload(entries[0].entry_id)
+
+
 @websocket_api.websocket_command(WS_LIST_ITEMS)
 @websocket_api.async_response
 async def _ws_list_items(hass: HomeAssistant, connection, msg) -> None:
@@ -678,6 +689,8 @@ def _register_services(hass: HomeAssistant) -> None:
         hass.services.async_remove(DOMAIN, SERVICE_COMPLETE_ITEM)
     if hass.services.has_service(DOMAIN, SERVICE_COMPLETE_ITEM_V2):
         hass.services.async_remove(DOMAIN, SERVICE_COMPLETE_ITEM_V2)
+    if hass.services.has_service(DOMAIN, SERVICE_RELOAD):
+        hass.services.async_remove(DOMAIN, SERVICE_RELOAD)
     hass.services.async_register(
         DOMAIN,
         SERVICE_UPSERT_ITEM,
@@ -689,6 +702,12 @@ def _register_services(hass: HomeAssistant) -> None:
         SERVICE_COMPLETE_ITEM_V2,
         _handle_complete_v2,
         schema=SERVICE_COMPLETE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RELOAD,
+        _handle_reload,
+        schema=vol.Schema({}),
     )
     websocket_api.async_register_command(hass, _ws_list_items)
     hass.data[DATA_SERVICES_REGISTERED] = True
