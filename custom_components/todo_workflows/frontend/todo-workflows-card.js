@@ -48,14 +48,13 @@ class TodoWorkflowsCard extends HTMLElement {
     if (!config) {
       throw new Error("config is required");
     }
+    const { entity, items_entity, ...cardConfig } = config;
     this._config = {
       title: "",
       show_add_button: true,
       add_button_label: "Add",
-      ...config,
+      ...cardConfig,
     };
-    delete this._config.entity;
-    delete this._config.items_entity;
     this._initialize();
   }
 

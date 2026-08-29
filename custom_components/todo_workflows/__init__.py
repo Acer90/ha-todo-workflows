@@ -54,7 +54,6 @@ PLATFORMS = ("todo",)
 
 SERVICE_UPSERT_SCHEMA = vol.Schema(
     {
-        vol.Optional(ATTR_ENTITY_ID): cv.entity_id,
         vol.Optional(ATTR_IDENT): cv.string,
         vol.Required(ATTR_TITLE): cv.string,
         vol.Optional(ATTR_DESCRIPTION, default=""): cv.string,
@@ -77,20 +76,16 @@ SERVICE_UPSERT_SCHEMA = vol.Schema(
 
 SERVICE_COMPLETE_SCHEMA = vol.Schema(
     {
-        vol.Optional(ATTR_ENTITY_ID): cv.entity_id,
         vol.Optional(ATTR_IDENT): cv.string,
         vol.Optional(ATTR_TITLE): cv.string,
         vol.Optional(ATTR_PERSISTENT): cv.boolean,
         vol.Optional("item_id"): cv.string,
         vol.Optional("uid"): cv.string,
-    },
-    extra=vol.ALLOW_EXTRA,
+    }
 )
 
 WS_LIST_ITEMS = {
     vol.Required("type"): "todo_workflows/list_items",
-    vol.Optional(ATTR_ENTITY_ID): cv.entity_id,
-    vol.Optional("items_entity"): cv.entity_id,
 }
 
 
@@ -306,6 +301,10 @@ def _extract_tasks_from_state(state) -> list[dict[str, Any]]:
 async def _get_items(
     hass: HomeAssistant, entity_id: str, items_entity: str | None = None
 ) -> list[dict[str, Any]]:
+    if not hass.states.get(entity_id):
+        _LOGGER.debug("Todo-Speicher ist noch nicht verfuegbar: %s", entity_id)
+        return []
+
     response = await _call_todo_service(
         hass,
         "get_items",
@@ -421,7 +420,7 @@ async def _find_item_by_title(
 async def _handle_upsert(call: ServiceCall) -> None:
     hass = call.hass
     data = dict(call.data)
-    entity_id = data.get(ATTR_ENTITY_ID, DEFAULT_TODO_ENTITY_ID)
+    entity_id = DEFAULT_TODO_ENTITY_ID
     title = data[ATTR_TITLE]
     ident = _normalize_lookup_key(data.get(ATTR_IDENT) or title)
     data[ATTR_IDENT] = ident
@@ -475,7 +474,7 @@ async def _handle_upsert(call: ServiceCall) -> None:
 async def _handle_complete(call: ServiceCall) -> None:
     hass = call.hass
     data = call.data
-    entity_id = data.get(ATTR_ENTITY_ID, DEFAULT_TODO_ENTITY_ID)
+    entity_id = DEFAULT_TODO_ENTITY_ID
     title_hint = data.get(ATTR_TITLE)
     ident = str(data.get(ATTR_IDENT) or title_hint or "").strip()
     _LOGGER.debug("complete_item called with data=%s", data)
@@ -647,9 +646,8 @@ async def _handle_reload(call: ServiceCall) -> None:
 @websocket_api.websocket_command(WS_LIST_ITEMS)
 @websocket_api.async_response
 async def _ws_list_items(hass: HomeAssistant, connection, msg) -> None:
-    entity_id = msg.get(ATTR_ENTITY_ID, DEFAULT_TODO_ENTITY_ID)
-    items_entity = msg.get("items_entity")
-    items = await _get_items(hass, entity_id, items_entity)
+    entity_id = DEFAULT_TODO_ENTITY_ID
+    items = await _get_items(hass, entity_id)
     await _cleanup_completed_items(hass, entity_id, items)
     normalized = []
 
@@ -782,9 +780,6 @@ async def _register_lovelace_resource(hass: HomeAssistant) -> None:
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     hass.data.setdefault(DOMAIN, {})[ATTR_CLEANUP_HOURS] = 0
-    _register_services(hass)
-    await _register_frontend(hass)
-    await _register_lovelace_resource(hass)
     return True
 
 
@@ -792,10 +787,10 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     hass.data.setdefault(DOMAIN, {})[ATTR_CLEANUP_HOURS] = entry.options.get(
         ATTR_CLEANUP_HOURS, 0
     )
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _register_services(hass)
     await _register_frontend(hass)
     await _register_lovelace_resource(hass)
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 

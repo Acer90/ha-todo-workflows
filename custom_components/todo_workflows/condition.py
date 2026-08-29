@@ -6,9 +6,8 @@ from typing import Any, Unpack, cast
 
 import voluptuous as vol
 
-from homeassistant.const import CONF_ENTITY_ID, CONF_OPTIONS, CONF_TARGET
+from homeassistant.const import CONF_OPTIONS
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.condition import Condition, ConditionCheckParams, ConditionConfig
 from homeassistant.helpers.typing import ConfigType
 
@@ -29,13 +28,8 @@ _OPTIONS_SCHEMA = vol.Schema(
     }
 )
 
-_TARGET_SCHEMA = vol.Schema(
-    {vol.Optional(CONF_ENTITY_ID): vol.All(cv.ensure_list, [cv.entity_id])}
-)
-
 _CONDITION_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_TARGET): _TARGET_SCHEMA,
         vol.Required(CONF_OPTIONS): _OPTIONS_SCHEMA,
     }
 )
@@ -50,11 +44,7 @@ class HasIdentCondition(Condition):
     ) -> ConfigType:
         """Validate and migrate top-level fields into target/options."""
         complete_config = dict(complete_config)
-        target = dict(complete_config.get(CONF_TARGET) or {})
         options = dict(complete_config.get(CONF_OPTIONS) or {})
-
-        if CONF_ENTITY_ID in complete_config and CONF_ENTITY_ID not in target:
-            target[CONF_ENTITY_ID] = complete_config.pop(CONF_ENTITY_ID)
 
         if ATTR_IDENT in complete_config and ATTR_IDENT not in options:
             options[ATTR_IDENT] = complete_config.pop(ATTR_IDENT)
@@ -62,7 +52,6 @@ class HasIdentCondition(Condition):
         if ATTR_COMPLETED in complete_config and ATTR_COMPLETED not in options:
             options[ATTR_COMPLETED] = complete_config.pop(ATTR_COMPLETED)
 
-        complete_config[CONF_TARGET] = target
         complete_config[CONF_OPTIONS] = options
         return await super().async_validate_complete_config(hass, complete_config)
 
@@ -76,13 +65,8 @@ class HasIdentCondition(Condition):
     def __init__(self, hass: HomeAssistant, config: ConditionConfig) -> None:
         """Initialize condition."""
         super().__init__(hass, config)
-        target = config.target or {}
         options = config.options or {}
 
-        self._entity_ids = [
-            str(entity_id)
-            for entity_id in target.get(CONF_ENTITY_ID, [DEFAULT_TODO_ENTITY_ID])
-        ]
         self._ident = str(options[ATTR_IDENT]).strip()
         self._expected_completed = options.get(ATTR_COMPLETED)
 
@@ -91,20 +75,17 @@ class HasIdentCondition(Condition):
         if not self._ident:
             return False
 
-        for entity_id in self._entity_ids:
-            item = _find_item_by_ident_in_entity(
-                self._hass, entity_id, self._ident
-            ) or _find_item_by_ident_in_states(self._hass, entity_id, self._ident)
-            if not item:
-                continue
+        item = _find_item_by_ident_in_entity(
+            self._hass, DEFAULT_TODO_ENTITY_ID, self._ident
+        ) or _find_item_by_ident_in_states(
+            self._hass, DEFAULT_TODO_ENTITY_ID, self._ident
+        )
+        if not item:
+            return False
 
-            if self._expected_completed is None:
-                return True
-
-            if _is_item_completed(item) == bool(self._expected_completed):
-                return True
-
-        return False
+        return self._expected_completed is None or _is_item_completed(item) == bool(
+            self._expected_completed
+        )
 
 
 CONDITIONS: dict[str, type[Condition]] = {

@@ -74,7 +74,9 @@ Lovelace-Resource:
 Verhalten:
 - reload:
   - laedt den Todo-Workflows-Config-Entry neu, einschliesslich der internen Todo-Liste und Lovelace-Resource-Registrierung
-- Die eigene Liste `todo.todo_workflows` ist die persistente Backend-Entity. Die Card kommuniziert ausschliesslich mit `todo_workflows`-Services und dem WebSocket und kennt keine Todo- oder Sensor-Entity.
+- Die eigene Liste `todo.todo_workflows` ist die persistente Backend-Entity und fest vorgegeben. Card, Services, WebSocket und Condition kommunizieren ausschliesslich mit Todo Workflows und bieten keine Listenauswahl.
+- Die Liste setzt ihre Entity-ID explizit als `todo.todo_workflows`; ein eventuell aus einer frueheren Version abgeleiteter Registry-Name wird beim Setup auf diese ID migriert.
+- Der Config-Entry richtet zuerst die interne Todo-Entity ein und registriert erst danach Services, Frontend und Lovelace-Resource. Der WebSocket liefert bei einem kurzzeitig fehlenden Speicher eine leere Liste statt einen fehlgeschlagenen `todo.get_items`-Aufruf aus.
 - upsert_item:
   - sucht Item per ident/titelnahen Fallbacks
   - aktualisiert vorhandenes Item oder legt neues Item an
@@ -122,7 +124,7 @@ Vor Anderungen:
 
 Beim Backend:
 - Service-Schema (voluptuous) strikt pflegen.
-- Condition-Schema (target/options) und Legacy-Feldmigration (entity_id/ident/completed) konsistent halten.
+- Condition-Schema und Options (`ident`, optional `completed`) konsistent halten; es gibt keine Listenauswahl.
 - Todo-Operationen ausschliesslich im Backend ausfuhren; die Card darf keine Todo- oder Sensor-Entities ansprechen.
 - Removal/Update nur mit belastbarer Identifikation ausfuhren.
 
@@ -182,7 +184,6 @@ Service-Beispiel (Upsert):
 
 service: todo_workflows.upsert_item
 data:
-  entity_id: todo.todo_list
   title: Auto laden
   ident: auto_laden
   description: Startet Ladevorgang
@@ -197,7 +198,6 @@ Service-Beispiel (Complete):
 
 service: todo_workflows.complete_item_v2
 data:
-  entity_id: todo.todo_list
   ident: auto_laden
   persistent: true
 
@@ -205,7 +205,6 @@ Lovelace-Beispiel (Card):
 
 type: custom:todo-workflows-card
 title: Aufgaben
-entity: todo.todo_list
 show_add_button: true
 add_button_label: Add
 
@@ -213,8 +212,6 @@ Automation-Beispiel (Condition):
 
 condition:
   - condition: todo_workflows.has_ident
-    target:
-      entity_id: todo.todo_list
     options:
       ident: auto_laden
       completed: true

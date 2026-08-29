@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from typing import Any
 from uuid import uuid4
@@ -11,12 +12,14 @@ from homeassistant.components.todo import (
     TodoListEntityFeature,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 
 from .const import DEFAULT_TODO_ENTITY_ID, DOMAIN
 
 _STORAGE_VERSION = 1
 _STORAGE_KEY = f"{DOMAIN}.items"
+_LOGGER = logging.getLogger(__name__)
 
 
 class TodoWorkflowsList(TodoListEntity):
@@ -25,7 +28,6 @@ class TodoWorkflowsList(TodoListEntity):
     _attr_has_entity_name = True
     _attr_name = "Tasks"
     _attr_unique_id = DOMAIN
-    _attr_entity_id = DEFAULT_TODO_ENTITY_ID
     _attr_supported_features = (
         TodoListEntityFeature.CREATE_TODO_ITEM
         | TodoListEntityFeature.UPDATE_TODO_ITEM
@@ -36,6 +38,7 @@ class TodoWorkflowsList(TodoListEntity):
     )
 
     def __init__(self, hass: HomeAssistant) -> None:
+        self.entity_id = DEFAULT_TODO_ENTITY_ID
         self._store = Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
         self._items: dict[str, TodoItem] = {}
 
@@ -111,6 +114,24 @@ class TodoWorkflowsList(TodoListEntity):
 
 async def async_setup_entry(hass, entry, async_add_entities) -> None:
     """Set up the Todo Workflows todo list."""
+    registry = er.async_get(hass)
+    existing_entity_id = registry.async_get_entity_id("todo", DOMAIN, DOMAIN)
+    target_entry = registry.async_get(DEFAULT_TODO_ENTITY_ID)
+    if (
+        existing_entity_id
+        and existing_entity_id != DEFAULT_TODO_ENTITY_ID
+        and target_entry is None
+    ):
+        registry.async_update_entity(
+            existing_entity_id,
+            new_entity_id=DEFAULT_TODO_ENTITY_ID,
+        )
+    elif existing_entity_id and existing_entity_id != DEFAULT_TODO_ENTITY_ID:
+        _LOGGER.warning(
+            "Die Todo-Workflows-Entity kann nicht nach %s migriert werden; "
+            "die Entity-ID ist bereits belegt",
+            DEFAULT_TODO_ENTITY_ID,
+        )
     todo_list = TodoWorkflowsList(hass)
     await todo_list.async_load()
     async_add_entities([todo_list])

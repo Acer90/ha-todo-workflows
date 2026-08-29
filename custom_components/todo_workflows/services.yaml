@@ -5,13 +5,6 @@ upsert_item:
   name: Upsert todo item
   description: Create or update a todo item identified by its title stored as ident in the description JSON.
   fields:
-    entity_id:
-      name: Todo list entity
-      description: The todo list entity. Defaults to todo.todo_workflows.
-      required: false
-      selector:
-        entity:
-          domain: todo
     ident:
       name: Ident
       description: Optional override. If omitted, the title is used as ident.
@@ -108,13 +101,6 @@ complete_item_v2:
   name: Complete todo item (v2)
   description: Same as complete_item, tolerant schema.
   fields:
-    entity_id:
-      name: Todo list entity
-      description: The todo list entity. Defaults to todo.todo_workflows.
-      required: false
-      selector:
-        entity:
-          domain: todo
     ident:
       name: Ident
       description: Optional override. If omitted, the title is used as ident.
