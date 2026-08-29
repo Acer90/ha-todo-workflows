@@ -1,10 +1,14 @@
-{
-  "domain": "todo_workflows",
-  "name": "Todo Workflows",
-  "version": "1.0.0",
-  "documentation": "https://example.local/todo_workflows",
-  "config_flow": true,
-  "requirements": [],
-  "codeowners": [],
-  "iot_class": "local_push"
+﻿{
+    "domain":  "todo_workflows",
+    "name":  "Todo Workflows",
+    "version":  "1.0.1",
+    "documentation":  "https://example.local/todo_workflows",
+    "config_flow":  true,
+    "requirements":  [
+
+                     ],
+    "codeowners":  [
+
+                   ],
+    "iot_class":  "local_push"
 }
