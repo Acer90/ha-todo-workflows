@@ -107,6 +107,7 @@ Kernpunkte:
 - Laedt Daten ausschliesslich uber callWS mit todo_workflows/list_items.
 - Abonniert das Home-Assistant-Event `todo_workflows_items_updated`, damit Aenderungen ohne Polling ueber `list_items` nachgeladen werden.
 - Sendet Aenderungen ausschliesslich an todo_workflows-Services; die Todo-Liste ist ein internes Speicher-Detail.
+- Wenn keine Aufgaben vorhanden sind, bleibt die Card im normalen Dashboard leer; nur im Lovelace-Bearbeitungsmodus zeigt sie den Platzhalter `Keine Aufgaben`.
 - Unterstutzt optimistische UI beim Abschluss (direkte UI-Reaktion, danach Refresh).
 - Enthalt ein Formular fur neue/aktualisierte Eintrage (Service upsert_item).
 
@@ -180,6 +181,7 @@ Frontend:
 - Aenderungen durch eine andere Todo-Workflows-Aktion aktualisieren die Card per Home-Assistant-Event.
 - Sortierung nach priority, dann due, dann title ist stabil.
 - Bei WebSocket-Fehlern zeigt die Card den Fehler und verwendet keine State- oder Sensor-Fallbacks.
+- Eine leere Liste zeigt ausserhalb des Bearbeitungsmodus keinen sichtbaren Leertext.
 
 ## 9) Definition of Done fur Agents
 

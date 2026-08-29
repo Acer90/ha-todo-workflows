@@ -365,25 +365,23 @@ class TodoWorkflowsCard extends HTMLElement {
       this._card.appendChild(error);
     }
 
-    const list = document.createElement("div");
-    list.className = "list";
+    if (this._items.length || this._isEditMode()) {
+      const list = document.createElement("div");
+      list.className = "list";
 
-    if (!this._items.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty";
-      if (this._loading) {
-        empty.textContent = "Loading...";
-      } else {
+      if (!this._items.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
         empty.textContent = "Keine Aufgaben";
+        list.appendChild(empty);
+      } else {
+        this._items.forEach((item) => {
+          list.appendChild(this._renderRow(item));
+        });
       }
-      list.appendChild(empty);
-    } else {
-      this._items.forEach((item) => {
-        list.appendChild(this._renderRow(item));
-      });
-    }
 
-    this._card.appendChild(list);
+      this._card.appendChild(list);
+    }
   }
 
   _renderForm() {
@@ -842,7 +840,12 @@ class TodoWorkflowsCard extends HTMLElement {
       loading: this._loading,
       error: this._error,
       items: this._items,
+      editMode: this._isEditMode(),
     });
+  }
+
+  _isEditMode() {
+    return Boolean(this._hass?.editMode);
   }
 
   _rowColor(value) {
