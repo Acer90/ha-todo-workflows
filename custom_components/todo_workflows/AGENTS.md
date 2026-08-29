@@ -67,6 +67,7 @@ WebSocket Command:
 
 Lovelace-Resource:
 - Die Card wird in Lovelace Storage Mode automatisch als `module`-Resource unter `/todo_workflows_frontend/todo-workflows-card.js?v={version}` angelegt und bei Versionswechsel aktualisiert.
+- Die Lovelace-Collection erwartet beim Anlegen/Aktualisieren `res_type: module`; gespeichert wird die Resource danach als `type: module`.
 - Im YAML-Resource-Mode muss die Resource in `configuration.yaml` gepflegt werden; die Integration schreibt YAML nicht um.
 
 Verhalten:

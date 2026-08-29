@@ -742,13 +742,16 @@ async def _register_lovelace_resource(hass: HomeAssistant) -> None:
     if existing_resource:
         if existing_resource.get("url") != CARD_RESOURCE_URL:
             await resources.async_update_item(
-                existing_resource["id"], {"url": CARD_RESOURCE_URL, "type": "module"}
+                existing_resource["id"],
+                {"url": CARD_RESOURCE_URL, "res_type": "module"},
             )
             _LOGGER.info(
                 "Todo-Workflows-Card-Resource aktualisiert: %s", CARD_RESOURCE_URL
             )
     else:
-        await resources.async_create_item({"url": CARD_RESOURCE_URL, "type": "module"})
+        await resources.async_create_item(
+            {"url": CARD_RESOURCE_URL, "res_type": "module"}
+        )
         _LOGGER.info(
             "Todo-Workflows-Card als Lovelace-Resource angelegt: %s",
             CARD_RESOURCE_URL,
