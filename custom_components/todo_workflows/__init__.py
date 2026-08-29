@@ -14,6 +14,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.lovelace.const import LOVELACE_DATA, MODE_STORAGE
+from homeassistant.components.todo.const import DATA_COMPONENT as TODO_DATA_COMPONENT
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
@@ -229,7 +230,7 @@ def _find_item_by_ident_in_entity(
     if not lookup_ident and not lookup_title:
         return None
 
-    todo_component = hass.data.get("todo")
+    todo_component = hass.data.get(TODO_DATA_COMPONENT)
     entity = todo_component.get_entity(entity_id) if todo_component else None
     for todo_item in getattr(entity, "todo_items", None) or []:
         item = {
@@ -301,7 +302,7 @@ def _extract_tasks_from_state(state) -> list[dict[str, Any]]:
 
 def _get_items_from_entity(hass: HomeAssistant, entity_id: str) -> list[dict[str, Any]] | None:
     """Read items directly from a registered Todo entity when available."""
-    todo_component = hass.data.get("todo")
+    todo_component = hass.data.get(TODO_DATA_COMPONENT)
     entity = todo_component.get_entity(entity_id) if todo_component else None
     todo_items = getattr(entity, "todo_items", None)
     if todo_items is None:
