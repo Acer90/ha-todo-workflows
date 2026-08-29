@@ -316,6 +316,11 @@ async def _get_items(
         target_entity_id=entity_id,
     )
     if response:
+        entity_response = response.get(entity_id)
+        if isinstance(entity_response, dict) and isinstance(
+            entity_response.get("items"), list
+        ):
+            return entity_response["items"]
         if isinstance(response.get("items"), list):
             return response["items"]
         if isinstance(response.get("response"), dict) and isinstance(

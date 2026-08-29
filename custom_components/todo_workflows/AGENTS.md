@@ -146,6 +146,7 @@ Pflegepflicht:
 - Unterschiedliche Item-IDs (uid, id, item_id) nicht vereinheitlicht.
 - description enthalt kein valides JSON, daher immer defensiv parsen.
 - todo.get_items kann je nach HA-Version unterschiedlich verschachtelte Antwortstrukturen liefern.
+- Die aktuelle Todo-Service-Antwort ist nach Entity-ID verschachtelt (`response["todo.todo_workflows"]["items"]`); flache und Legacy-Formen bleiben ebenfalls unterstuetzt.
 - Condition-Checks laufen synchron und mussen deshalb auf vorhandene States zugreifen statt Service-Calls.
 - Browser-Cache kann alte Card-Versionen halten (bei JS-Anderungen mit Versionsbump arbeiten).
 - Lovelace Resources koennen im YAML-Modus nicht von der Integration persistiert angelegt werden.
