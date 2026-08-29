@@ -62,6 +62,7 @@ Registrierte Services (Domain todo_workflows):
 
 Registrierte Condition (Automation/Skript):
 - todo_workflows.has_ident
+  - YAML-Form: `condition: todo_workflows.has_ident` mit `options.ident` und optional `options.completed`
 
 WebSocket Command:
 - type: todo_workflows/list_items
