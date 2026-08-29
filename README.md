@@ -1,4 +1,4 @@
-﻿# todo_workflows
+# todo_workflows
 
 Home Assistant Integration fuer Todo-Workflows
 
