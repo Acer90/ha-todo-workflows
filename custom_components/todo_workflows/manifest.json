@@ -1,12 +1,13 @@
 {
     "domain":  "todo_workflows",
     "name":  "Todo Workflows",
-    "version":  "1.0.4",
+    "version":  "1.0.6",
     "documentation":  "https://example.local/todo_workflows",
     "config_flow":  true,
     "dependencies":  [
                          "http",
-                         "frontend"
+                         "frontend",
+                         "lovelace"
                      ],
     "requirements":  [
 

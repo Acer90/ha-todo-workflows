@@ -4,7 +4,8 @@ Diese Anleitung richtet sich an zukunftige Agents, die an der Integration todo_w
 
 ## 1) Ziel und Scope
 
-Die Integration erweitert Home Assistant Todo-Listen um:
+Die Integration verwaltet eine eigene persistente Home-Assistant-Todo-Liste und erweitert sie um:
+- Eine eigene persistente Standardliste (`todo.todo_workflows`), die beim Einrichten des Config-Entries angelegt wird
 - Upsert von Aufgaben anhand einer stabilen Identifikation (ident)
 - Abschluss-Logik mit persistenten Aufgaben (statt sofortigem Entfernen)
 - Optionales Auto-Cleanup fur erledigte persistente Aufgaben
@@ -16,6 +17,7 @@ Die Custom Card zeigt diese Daten an, bietet ein Add-Formular und Completion dir
 
 Backend (Integration):
 - custom_components/todo_workflows/__init__.py
+- custom_components/todo_workflows/todo.py
 - custom_components/todo_workflows/condition.py
 - custom_components/todo_workflows/const.py
 - custom_components/todo_workflows/services.yaml
@@ -63,7 +65,12 @@ Registrierte Condition (Automation/Skript):
 WebSocket Command:
 - type: todo_workflows/list_items
 
+Lovelace-Resource:
+- Die Card wird in Lovelace Storage Mode automatisch als `module`-Resource unter `/todo_workflows_frontend/todo-workflows-card.js?v={version}` angelegt und bei Versionswechsel aktualisiert.
+- Im YAML-Resource-Mode muss die Resource in `configuration.yaml` gepflegt werden; die Integration schreibt YAML nicht um.
+
 Verhalten:
+- Die eigene Liste `todo.todo_workflows` ist die persistente Backend-Entity. Die Card kommuniziert ausschliesslich mit `todo_workflows`-Services und dem WebSocket und kennt keine Todo- oder Sensor-Entity.
 - upsert_item:
   - sucht Item per ident/titelnahen Fallbacks
   - aktualisiert vorhandenes Item oder legt neues Item an
@@ -73,7 +80,7 @@ Verhalten:
 - todo_workflows.has_ident:
   - pruft, ob ein Item mit ident existiert
   - optional mit completed=true/false zur Status-Prufung
-  - liest aus States/Fallback-Sensoren (kein aktiver todo.get_items Call im Condition-Check)
+  - liest direkt aus registrierten Todo-Entities oder States/Fallback-Sensoren (kein aktiver todo.get_items Call im Condition-Check)
 - list_items:
   - ladt Items
   - fuhrt Cleanup (falls fallig) aus
@@ -86,8 +93,8 @@ Datei:
 
 Kernpunkte:
 - Nutzt Shadow DOM und rendert eine Liste mit Styling pro Item.
-- Ladt Daten uber callWS mit todo_workflows/list_items.
-- Nutzt Fallback auf Sensor-State (items_entity), falls WS keine Items liefert.
+- Laedt Daten ausschliesslich uber callWS mit todo_workflows/list_items.
+- Sendet Aenderungen ausschliesslich an todo_workflows-Services; die Todo-Liste ist ein internes Speicher-Detail.
 - Unterstutzt optimistische UI beim Abschluss (direkte UI-Reaktion, danach Refresh).
 - Enthalt ein Formular fur neue/aktualisierte Eintrage (Service upsert_item).
 
@@ -105,14 +112,14 @@ Aktuelle Refresh-Defaults der Card:
 ## 6) Arbeitsregeln fur Agents
 
 Vor Anderungen:
-- Immer zuerst den Datenfluss prufen: Service -> Todo-Entity -> WebSocket -> Card-Render.
+- Immer zuerst den Datenfluss prufen: Card -> todo_workflows-Service/WebSocket -> Todo-Entity als Speicher -> Card-Render.
 - Bei Feldanderungen description-JSON und Normalisierung synchron halten.
 - Bei neuen Feldern sowohl Backend als auch Card anpassen (inkl. Form und Rendering).
 
 Beim Backend:
 - Service-Schema (voluptuous) strikt pflegen.
 - Condition-Schema (target/options) und Legacy-Feldmigration (entity_id/ident/completed) konsistent halten.
-- Fallback-Verhalten nicht entfernen (State-basierte Reads bleiben wichtig).
+- Todo-Operationen ausschliesslich im Backend ausfuhren; die Card darf keine Todo- oder Sensor-Entities ansprechen.
 - Removal/Update nur mit belastbarer Identifikation ausfuhren.
 
 Bei der Card:
@@ -132,11 +139,14 @@ Pflegepflicht:
 - todo.get_items kann je nach HA-Version unterschiedlich verschachtelte Antwortstrukturen liefern.
 - Condition-Checks laufen synchron und mussen deshalb auf vorhandene States zugreifen statt Service-Calls.
 - Browser-Cache kann alte Card-Versionen halten (bei JS-Anderungen mit Versionsbump arbeiten).
+- Lovelace Resources koennen im YAML-Modus nicht von der Integration persistiert angelegt werden.
 - Card und Integration konnen asynchron unterschiedliche Datenstande sehen; post-action refresh ist daher gewollt.
+- Die Standardliste wird per Home-Assistant-Store persistiert; sie darf nicht durch fluchtigen Entity-State ersetzt werden.
 
 ## 8) Test-Checkliste fur Anderungen
 
 Backend:
+- Nach dem Einrichten des Config-Entries existiert `todo.todo_workflows`; neu angelegte Items bleiben nach einem Home-Assistant-Neustart erhalten.
 - upsert_item erstellt neues Item.
 - upsert_item aktualisiert vorhandenes Item per ident.
 - complete_item_v2 entfernt nicht-persistentes Item.
@@ -147,10 +157,11 @@ Backend:
 - Condition todo_workflows.has_ident respektiert optional completed=true/false.
 
 Frontend:
+- Die Card-Resource erscheint nach dem Setup in Dashboard -> Ressourcen als `module` mit einer versionsierten URL, zum Beispiel `/todo_workflows_frontend/todo-workflows-card.js?v=1.0.6`.
 - Add-Form sendet alle Felder korrekt.
 - Completion aktualisiert UI sofort und bleibt nach Refresh konsistent.
 - Sortierung nach priority, dann due, dann title ist stabil.
-- Fallback auf items_entity funktioniert bei WS-Fehlern.
+- Bei WebSocket-Fehlern zeigt die Card den Fehler und verwendet keine State- oder Sensor-Fallbacks.
 
 ## 9) Definition of Done fur Agents
 

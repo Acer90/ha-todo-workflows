@@ -4,8 +4,8 @@ upsert_item:
   fields:
     entity_id:
       name: Todo list entity
-      description: The todo list entity.
-      required: true
+      description: The todo list entity. Defaults to todo.todo_workflows.
+      required: false
       selector:
         entity:
           domain: todo
@@ -107,8 +107,8 @@ complete_item_v2:
   fields:
     entity_id:
       name: Todo list entity
-      description: The todo list entity.
-      required: true
+      description: The todo list entity. Defaults to todo.todo_workflows.
+      required: false
       selector:
         entity:
           domain: todo

@@ -12,7 +12,12 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.condition import Condition, ConditionCheckParams, ConditionConfig
 from homeassistant.helpers.typing import ConfigType
 
-from . import _find_item_by_ident_in_states, _is_item_completed
+from . import (
+    _find_item_by_ident_in_entity,
+    _find_item_by_ident_in_states,
+    _is_item_completed,
+)
+from .const import DEFAULT_TODO_ENTITY_ID
 
 ATTR_IDENT = "ident"
 ATTR_COMPLETED = "completed"
@@ -25,9 +30,7 @@ _OPTIONS_SCHEMA = vol.Schema(
 )
 
 _TARGET_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_ENTITY_ID): vol.All(cv.ensure_list, [cv.entity_id]),
-    }
+    {vol.Optional(CONF_ENTITY_ID): vol.All(cv.ensure_list, [cv.entity_id])}
 )
 
 _CONDITION_SCHEMA = vol.Schema(
@@ -76,7 +79,10 @@ class HasIdentCondition(Condition):
         target = config.target or {}
         options = config.options or {}
 
-        self._entity_ids = [str(entity_id) for entity_id in target.get(CONF_ENTITY_ID, [])]
+        self._entity_ids = [
+            str(entity_id)
+            for entity_id in target.get(CONF_ENTITY_ID, [DEFAULT_TODO_ENTITY_ID])
+        ]
         self._ident = str(options[ATTR_IDENT]).strip()
         self._expected_completed = options.get(ATTR_COMPLETED)
 
@@ -86,7 +92,9 @@ class HasIdentCondition(Condition):
             return False
 
         for entity_id in self._entity_ids:
-            item = _find_item_by_ident_in_states(self._hass, entity_id, self._ident)
+            item = _find_item_by_ident_in_entity(
+                self._hass, entity_id, self._ident
+            ) or _find_item_by_ident_in_states(self._hass, entity_id, self._ident)
             if not item:
                 continue
 

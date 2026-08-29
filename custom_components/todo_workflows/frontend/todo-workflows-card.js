@@ -1,4 +1,4 @@
-const TODO_WORKFLOWS_CARD_VERSION = "1.0.27";
+const TODO_WORKFLOWS_CARD_VERSION = "1.0.29";
 const TODO_WORKFLOWS_FULL_RELOAD_MS = 5 * 60 * 1000;
 const TODO_WORKFLOWS_FETCH_COOLDOWN_MS = 200;
 const TODO_WORKFLOWS_POST_ACTION_REFRESH_DELAYS_MS = [150, 600];
@@ -17,8 +17,6 @@ class TodoWorkflowsCard extends HTMLElement {
     this._pendingUpdateTimer = null;
     this._postActionRefreshTimers = [];
     this._formOpen = false;
-    this._lastRelevantStateSignature = null;
-    this._lastResolvedItemsEntity = null;
     this._lastRenderSignature = null;
     this._lastFullReloadAt = 0;
     this._formValues = {
@@ -43,12 +41,12 @@ class TodoWorkflowsCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entity: "todo.todo_list" };
+    return {};
   }
 
   setConfig(config) {
-    if (!config || !config.entity) {
-      throw new Error("entity is required");
+    if (!config) {
+      throw new Error("config is required");
     }
     this._config = {
       title: "",
@@ -56,15 +54,14 @@ class TodoWorkflowsCard extends HTMLElement {
       add_button_label: "Add",
       ...config,
     };
+    delete this._config.entity;
+    delete this._config.items_entity;
     this._initialize();
   }
 
   set hass(hass) {
     this._hass = hass;
     const forceFullReload = this._shouldForceFullReload();
-    if (!forceFullReload && !this._hasRelevantStateChanged(hass)) {
-      return;
-    }
     this._update(forceFullReload);
   }
 
@@ -375,8 +372,7 @@ class TodoWorkflowsCard extends HTMLElement {
       if (this._loading) {
         empty.textContent = "Loading...";
       } else {
-        const source = this._resolveItemsEntity();
-        empty.textContent = source ? `Keine Aufgaben (Quelle: ${source})` : "Keine Aufgaben";
+        empty.textContent = "Keine Aufgaben";
       }
       list.appendChild(empty);
     } else {
@@ -591,8 +587,7 @@ class TodoWorkflowsCard extends HTMLElement {
   }
 
   async _submitForm() {
-    const entity = this._config?.entity;
-    if (!this._hass || !entity) {
+    if (!this._hass) {
       return;
     }
 
@@ -606,7 +601,6 @@ class TodoWorkflowsCard extends HTMLElement {
     const ident = title;
 
     await this._hass.callService("todo_workflows", "upsert_item", {
-      entity_id: entity,
       ident,
       title,
       description: this._formValues.description || "",
@@ -641,13 +635,11 @@ class TodoWorkflowsCard extends HTMLElement {
   }
 
   async _completeItem(item) {
-    const entity = this._config?.entity;
     const ident = item.ident || item.title;
-    if (!this._hass || !entity || !ident) {
+    if (!this._hass || !ident) {
       return;
     }
     const payload = {
-      entity_id: entity,
       ident,
       item_id: item.id,
       title: item.title,
@@ -750,7 +742,7 @@ class TodoWorkflowsCard extends HTMLElement {
   }
 
   async _fetchItems(force = false) {
-    if (!this._hass || !this._config?.entity) {
+    if (!this._hass || !this._config) {
       return;
     }
 
@@ -766,8 +758,6 @@ class TodoWorkflowsCard extends HTMLElement {
     this._fetchPromise = this._hass
       .callWS({
         type: "todo_workflows/list_items",
-        entity_id: this._config.entity,
-        items_entity: this._resolveItemsEntity(),
       })
       .then((result) => {
         const items =
@@ -776,11 +766,11 @@ class TodoWorkflowsCard extends HTMLElement {
           this._setItems(items);
           return;
         }
-        this._setItems(this._readItemsFromState(this._resolveItemsEntity()));
+        this._setItems([]);
       })
       .catch((err) => {
         this._error = err?.message || String(err);
-        this._setItems(this._readItemsFromState(this._resolveItemsEntity()));
+        this._setItems([]);
       })
       .finally(() => {
         this._loading = false;
@@ -816,134 +806,6 @@ class TodoWorkflowsCard extends HTMLElement {
     this._items = nextItems;
   }
 
-  _extractTasksSnapshot(state) {
-    if (!state?.attributes) {
-      return [];
-    }
-    const tasks = state.attributes.tasks || state.attributes.items;
-    if (Array.isArray(tasks)) {
-      return tasks;
-    }
-    if (tasks && Array.isArray(tasks.items)) {
-      return tasks.items;
-    }
-    return [];
-  }
-
-  _readItemsFromState(entityId) {
-    const resolvedEntity = entityId || this._resolveItemsEntity();
-    if (!resolvedEntity || !this._hass?.states?.[resolvedEntity]) {
-      return [];
-    }
-    const state = this._hass.states[resolvedEntity];
-    const rawTasks = state.attributes?.tasks || state.attributes?.items;
-    const tasks = Array.isArray(rawTasks)
-      ? rawTasks
-      : Array.isArray(rawTasks?.items)
-        ? rawTasks.items
-        : [];
-    if (!tasks.length) {
-      return [];
-    }
-    return tasks.map((task) => ({
-      id: task.uid || task.id || task.item_id,
-      title:
-        this._parseDescription(task.description || "").title ||
-        task.summary ||
-        task.title ||
-        task.item ||
-        "",
-      status: task.status,
-      description: this._parseDescription(task.description || "").description || "",
-      badge: this._parseDescription(task.description || "").badge || "",
-      due: this._parseDescription(task.description || "").due || "",
-      priority: this._parseDescription(task.description || "").priority ?? 0,
-      icon: this._parseDescription(task.description || "").icon || "",
-      color: this._parseDescription(task.description || "").color || "",
-      second_color: this._parseDescription(task.description || "").second_color || "",
-      icon_background_color: this._parseDescription(task.description || "").icon_background_color || "",
-      icon_color: this._parseDescription(task.description || "").icon_color || "",
-      text_color: this._parseDescription(task.description || "").text_color || "",
-      ident:
-        this._parseDescription(task.description || "").ident ||
-        task.summary ||
-        task.title ||
-        task.item ||
-        "",
-      persistent: this._parseDescription(task.description || "").persistent || false,
-      resolved_text: this._parseDescription(task.description || "").resolved_text || "",
-    }));
-  }
-
-  _resolveItemsEntity() {
-    if (this._config?.items_entity) {
-      return this._config.items_entity;
-    }
-    if (!this._hass || !this._config?.entity) {
-      return null;
-    }
-    const entityId = this._config.entity;
-    const slug = entityId.split(".")[1];
-    const candidates = [
-      `sensor.${slug}_eintrage`,
-      `sensor.${slug}_entries`,
-      `sensor.${slug}_items`,
-    ];
-    for (const candidate of candidates) {
-      if (this._hass.states?.[candidate]) {
-        return candidate;
-      }
-    }
-    const todoName =
-      this._hass.states?.[entityId]?.attributes?.friendly_name?.toLowerCase() || "";
-    const taskSensors = Object.entries(this._hass.states || {}).filter(
-      ([id, state]) =>
-        id.startsWith("sensor.") &&
-        state?.attributes &&
-        Array.isArray(state.attributes.tasks)
-    );
-    if (todoName) {
-      for (const [id, state] of taskSensors) {
-        const name = (state.attributes?.friendly_name || "").toLowerCase();
-        if (name.includes(todoName)) {
-          return id;
-        }
-      }
-    }
-    if (taskSensors.length === 1) {
-      return taskSensors[0][0];
-    }
-    return null;
-  }
-
-  _hasRelevantStateChanged(nextHass) {
-    if (!nextHass || !this._config?.entity) {
-      return false;
-    }
-
-    const resolvedItemsEntity = this._resolveItemsEntity();
-    const entityState = nextHass.states?.[this._config.entity] || null;
-    const itemsState = resolvedItemsEntity ? nextHass.states?.[resolvedItemsEntity] || null : null;
-    const nextSignature = JSON.stringify({
-      entityId: this._config.entity,
-      resolvedItemsEntity,
-      entityState: entityState?.state || null,
-      entityLastChanged: entityState?.last_changed || null,
-      entityLastUpdated: entityState?.last_updated || null,
-      entityTasks: this._extractTasksSnapshot(entityState),
-      itemsState: itemsState?.state || null,
-      itemsLastChanged: itemsState?.last_changed || null,
-      itemsLastUpdated: itemsState?.last_updated || null,
-      itemsTasks: this._extractTasksSnapshot(itemsState),
-    });
-    const changed = this._lastRelevantStateSignature !== nextSignature;
-
-    this._lastRelevantStateSignature = nextSignature;
-    this._lastResolvedItemsEntity = resolvedItemsEntity;
-
-    return changed;
-  }
-
   _shouldForceFullReload() {
     return Date.now() - this._lastFullReloadAt >= TODO_WORKFLOWS_FULL_RELOAD_MS;
   }
@@ -957,20 +819,7 @@ class TodoWorkflowsCard extends HTMLElement {
       loading: this._loading,
       error: this._error,
       items: this._items,
-      itemsEntity: this._lastResolvedItemsEntity,
     });
-  }
-
-  _parseDescription(value) {
-    try {
-      const data = JSON.parse(value);
-      if (data && typeof data === "object") {
-        return data;
-      }
-    } catch (err) {
-      return {};
-    }
-    return {};
   }
 
   _rowColor(value) {
@@ -1168,8 +1017,6 @@ class TodoWorkflowsCardEditor extends HTMLElement {
   _render(force = false) {
     const renderSignature = JSON.stringify({
       title: this._config?.title || "",
-      entity: this._config?.entity || "",
-      itemsEntity: this._config?.items_entity || "",
       showAddButton: this._config?.show_add_button ?? true,
     });
     if (!force && this.shadowRoot && renderSignature === this._lastRenderSignature) {
@@ -1192,15 +1039,11 @@ class TodoWorkflowsCardEditor extends HTMLElement {
       </style>
       <div class="form">
         <ha-textfield label="Title" name="title"></ha-textfield>
-        <ha-entity-picker label="Todo entity" name="entity" .hass="${""}"></ha-entity-picker>
-        <ha-entity-picker label="Items entity" name="items_entity" .hass="${""}"></ha-entity-picker>
         <ha-switch name="show_add_button"></ha-switch>
       </div>
     `;
 
     const title = root.querySelector("ha-textfield[name=title]");
-    const entity = root.querySelector("ha-entity-picker[name=entity]");
-    const itemsEntity = root.querySelector("ha-entity-picker[name=items_entity]");
     const addToggle = root.querySelector("ha-switch[name=show_add_button]");
 
     this._updateEditorBindings();
@@ -1227,8 +1070,6 @@ class TodoWorkflowsCardEditor extends HTMLElement {
     };
 
     title.addEventListener("input", handler);
-    entity.addEventListener("value-changed", handler);
-    itemsEntity.addEventListener("value-changed", handler);
     addToggle.addEventListener("change", handler);
   }
 
@@ -1237,17 +1078,11 @@ class TodoWorkflowsCardEditor extends HTMLElement {
       return;
     }
     const title = this.shadowRoot.querySelector("ha-textfield[name=title]");
-    const entity = this.shadowRoot.querySelector("ha-entity-picker[name=entity]");
-    const itemsEntity = this.shadowRoot.querySelector("ha-entity-picker[name=items_entity]");
     const addToggle = this.shadowRoot.querySelector("ha-switch[name=show_add_button]");
-    if (!title || !entity || !itemsEntity || !addToggle) {
+    if (!title || !addToggle) {
       return;
     }
     title.value = this._config?.title || "";
-    entity.hass = this._hass;
-    entity.value = this._config?.entity || "";
-    itemsEntity.hass = this._hass;
-    itemsEntity.value = this._config?.items_entity || "";
     addToggle.checked = this._config?.show_add_button ?? true;
   }
 }

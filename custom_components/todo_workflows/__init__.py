@@ -7,12 +7,13 @@ import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
-from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.lovelace.const import LOVELACE_DATA, MODE_STORAGE
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
@@ -34,6 +35,7 @@ from .const import (
     ATTR_SECOND_COLOR,
     ATTR_TEXT_COLOR,
     ATTR_TITLE,
+    DEFAULT_TODO_ENTITY_ID,
     DOMAIN,
     SERVICE_COMPLETE_ITEM,
     SERVICE_COMPLETE_ITEM_V2,
@@ -44,11 +46,15 @@ _LOGGER = logging.getLogger(__name__)
 
 DATA_SERVICES_REGISTERED = f"{DOMAIN}_services_registered"
 DATA_FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
+DATA_LOVELACE_RESOURCE_REGISTERED = f"{DOMAIN}_lovelace_resource_registered"
 CARD_URL = "/todo_workflows_frontend/todo-workflows-card.js"
+CARD_VERSION = "1.0.6"
+CARD_RESOURCE_URL = f"{CARD_URL}?v={CARD_VERSION}"
+PLATFORMS = ("todo",)
 
 SERVICE_UPSERT_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+        vol.Optional(ATTR_ENTITY_ID): cv.entity_id,
         vol.Optional(ATTR_IDENT): cv.string,
         vol.Required(ATTR_TITLE): cv.string,
         vol.Optional(ATTR_DESCRIPTION, default=""): cv.string,
@@ -83,7 +89,7 @@ SERVICE_COMPLETE_SCHEMA = vol.Schema(
 
 WS_LIST_ITEMS = {
     vol.Required("type"): "todo_workflows/list_items",
-    vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+    vol.Optional(ATTR_ENTITY_ID): cv.entity_id,
     vol.Optional("items_entity"): cv.entity_id,
 }
 
@@ -215,6 +221,32 @@ def _find_item_by_ident_in_states(
                 return task
             if lookup_title and lookup_title in keys:
                 return task
+    return None
+
+
+def _find_item_by_ident_in_entity(
+    hass: HomeAssistant, entity_id: str, ident: str, title: str | None = None
+) -> dict[str, Any] | None:
+    """Find an item from a registered Todo entity without a service call."""
+    lookup_ident = _normalize_lookup_key(ident)
+    lookup_title = _normalize_lookup_key(title)
+    if not lookup_ident and not lookup_title:
+        return None
+
+    todo_component = hass.data.get("todo")
+    entity = todo_component.get_entity(entity_id) if todo_component else None
+    for todo_item in getattr(entity, "todo_items", None) or []:
+        item = {
+            "uid": todo_item.uid,
+            "summary": todo_item.summary,
+            "status": todo_item.status.value if todo_item.status else None,
+            "description": todo_item.description,
+        }
+        keys = _item_lookup_keys(item)
+        if lookup_ident and lookup_ident in keys:
+            return item
+        if lookup_title and lookup_title in keys:
+            return item
     return None
 
 
@@ -389,7 +421,7 @@ async def _find_item_by_title(
 async def _handle_upsert(call: ServiceCall) -> None:
     hass = call.hass
     data = dict(call.data)
-    entity_id = data[ATTR_ENTITY_ID]
+    entity_id = data.get(ATTR_ENTITY_ID, DEFAULT_TODO_ENTITY_ID)
     title = data[ATTR_TITLE]
     ident = _normalize_lookup_key(data.get(ATTR_IDENT) or title)
     data[ATTR_IDENT] = ident
@@ -443,12 +475,12 @@ async def _handle_upsert(call: ServiceCall) -> None:
 async def _handle_complete(call: ServiceCall) -> None:
     hass = call.hass
     data = call.data
-    entity_id = data.get(ATTR_ENTITY_ID)
+    entity_id = data.get(ATTR_ENTITY_ID, DEFAULT_TODO_ENTITY_ID)
     title_hint = data.get(ATTR_TITLE)
     ident = str(data.get(ATTR_IDENT) or title_hint or "").strip()
     _LOGGER.debug("complete_item called with data=%s", data)
-    if not entity_id or not ident:
-        _LOGGER.warning("complete_item missing entity_id or title/ident: %s", data)
+    if not ident:
+        _LOGGER.warning("complete_item missing title/ident: %s", data)
         return
     persistent_override = data.get(ATTR_PERSISTENT)
     item_id = data.get("item_id")
@@ -605,7 +637,7 @@ async def _handle_complete_v2(call: ServiceCall) -> None:
 @websocket_api.websocket_command(WS_LIST_ITEMS)
 @websocket_api.async_response
 async def _ws_list_items(hass: HomeAssistant, connection, msg) -> None:
-    entity_id = msg[ATTR_ENTITY_ID]
+    entity_id = msg.get(ATTR_ENTITY_ID, DEFAULT_TODO_ENTITY_ID)
     items_entity = msg.get("items_entity")
     items = await _get_items(hass, entity_id, items_entity)
     await _cleanup_completed_items(hass, entity_id, items)
@@ -674,7 +706,6 @@ async def _register_frontend(hass: HomeAssistant) -> None:
         await hass.http.async_register_static_paths(
             [StaticPathConfig(CARD_URL, file_path, False)]
         )
-        add_extra_js_url(hass, CARD_URL)
     except Exception:
         _LOGGER.exception("Registrieren der Todo-Workflows-Card ist fehlgeschlagen")
         return
@@ -682,10 +713,54 @@ async def _register_frontend(hass: HomeAssistant) -> None:
     _LOGGER.debug("Todo-Workflows-Card registriert unter %s", CARD_URL)
 
 
+async def _register_lovelace_resource(hass: HomeAssistant) -> None:
+    """Add the card as a persistent Lovelace resource when storage mode is used."""
+    if hass.data.get(DATA_LOVELACE_RESOURCE_REGISTERED):
+        return
+
+    lovelace_data = hass.data.get(LOVELACE_DATA)
+    if not lovelace_data:
+        _LOGGER.warning("Lovelace ist nicht bereit, Card-Resource wird nicht angelegt")
+        return
+    if lovelace_data.resource_mode != MODE_STORAGE:
+        _LOGGER.warning(
+            "Lovelace-Resources laufen im YAML-Modus; %s muss in configuration.yaml eingetragen werden",
+            CARD_RESOURCE_URL,
+        )
+        return
+
+    resources = lovelace_data.resources
+    await resources.async_get_info()
+    existing_resource = next(
+        (
+            resource
+            for resource in resources.async_items()
+            if urlsplit(resource.get("url", "")).path == CARD_URL
+        ),
+        None,
+    )
+    if existing_resource:
+        if existing_resource.get("url") != CARD_RESOURCE_URL:
+            await resources.async_update_item(
+                existing_resource["id"], {"url": CARD_RESOURCE_URL, "type": "module"}
+            )
+            _LOGGER.info(
+                "Todo-Workflows-Card-Resource aktualisiert: %s", CARD_RESOURCE_URL
+            )
+    else:
+        await resources.async_create_item({"url": CARD_RESOURCE_URL, "type": "module"})
+        _LOGGER.info(
+            "Todo-Workflows-Card als Lovelace-Resource angelegt: %s",
+            CARD_RESOURCE_URL,
+        )
+    hass.data[DATA_LOVELACE_RESOURCE_REGISTERED] = True
+
+
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     hass.data.setdefault(DOMAIN, {})[ATTR_CLEANUP_HOURS] = 0
     _register_services(hass)
     await _register_frontend(hass)
+    await _register_lovelace_resource(hass)
     return True
 
 
@@ -695,4 +770,11 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     )
     _register_services(hass)
     await _register_frontend(hass)
+    await _register_lovelace_resource(hass)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
+    """Unload the Todo Workflows config entry."""
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
