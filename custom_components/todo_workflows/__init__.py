@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -10,6 +11,8 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
+from homeassistant.components.frontend import add_extra_js_url
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
@@ -40,6 +43,8 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 DATA_SERVICES_REGISTERED = f"{DOMAIN}_services_registered"
+DATA_FRONTEND_REGISTERED = f"{DOMAIN}_frontend_registered"
+CARD_URL = "/todo_workflows_frontend/todo-workflows-card.js"
 
 SERVICE_UPSERT_SCHEMA = vol.Schema(
     {
@@ -658,9 +663,21 @@ def _register_services(hass: HomeAssistant) -> None:
     hass.data[DATA_SERVICES_REGISTERED] = True
 
 
+async def _register_frontend(hass: HomeAssistant) -> None:
+    if hass.data.get(DATA_FRONTEND_REGISTERED):
+        return
+    file_path = os.path.join(os.path.dirname(__file__), "frontend", "todo-workflows-card.js")
+    await hass.http.async_register_static_paths(
+        [StaticPathConfig(CARD_URL, file_path, False)]
+    )
+    add_extra_js_url(hass, CARD_URL)
+    hass.data[DATA_FRONTEND_REGISTERED] = True
+
+
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     hass.data.setdefault(DOMAIN, {})[ATTR_CLEANUP_HOURS] = 0
     _register_services(hass)
+    await _register_frontend(hass)
     return True
 
 
@@ -669,4 +686,5 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
         ATTR_CLEANUP_HOURS, 0
     )
     _register_services(hass)
+    await _register_frontend(hass)
     return True
