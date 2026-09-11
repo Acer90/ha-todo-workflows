@@ -81,6 +81,12 @@ upsert_item:
       required: false
       selector:
         boolean:
+    hide_when_completed:
+      name: Hide when completed
+      description: Hide a persistent item in the card after completion without deleting it.
+      required: false
+      selector:
+        boolean:
     resolved_text:
       name: Resolved text
       description: Text to show when persistent items are completed.
@@ -116,6 +122,12 @@ complete_item_v2:
     persistent:
       name: Persistent override
       description: If true, mark item completed instead of deleting.
+      required: false
+      selector:
+        boolean:
+    hide_when_completed:
+      name: Hide when completed
+      description: Hide a persistent item in the card after completion without deleting it.
       required: false
       selector:
         boolean:

@@ -30,6 +30,7 @@ from .const import (
     ATTR_ICON,
     ATTR_ICON_BACKGROUND_COLOR,
     ATTR_ICON_COLOR,
+    ATTR_HIDE_WHEN_COMPLETED,
     ATTR_IDENT,
     ATTR_PERSISTENT,
     ATTR_PRIORITY,
@@ -68,6 +69,7 @@ SERVICE_UPSERT_SCHEMA = vol.Schema(
         vol.Optional(ATTR_ICON_COLOR, default=""): cv.string,
         vol.Optional(ATTR_TEXT_COLOR, default=""): cv.string,
         vol.Optional(ATTR_PERSISTENT, default=False): cv.boolean,
+        vol.Optional(ATTR_HIDE_WHEN_COMPLETED, default=False): cv.boolean,
         vol.Optional(ATTR_RESOLVED_TEXT, default=""): cv.string,
         vol.Optional(ATTR_CLEANUP_HOURS): vol.Coerce(int),
         vol.Optional("item_id"): cv.string,
@@ -80,6 +82,7 @@ SERVICE_COMPLETE_SCHEMA = vol.Schema(
         vol.Optional(ATTR_IDENT): cv.string,
         vol.Optional(ATTR_TITLE): cv.string,
         vol.Optional(ATTR_PERSISTENT): cv.boolean,
+        vol.Optional(ATTR_HIDE_WHEN_COMPLETED): cv.boolean,
         vol.Optional("item_id"): cv.string,
         vol.Optional("uid"): cv.string,
     }
@@ -125,6 +128,10 @@ def _extract_item_description(item: dict[str, Any]) -> str:
         except Exception:
             return ""
     return str(value)
+
+
+def _status_value(status: Any) -> Any:
+    return status.value if hasattr(status, "value") else status
 
 
 def _parse_description_json(description: str) -> dict[str, Any] | None:
@@ -236,7 +243,7 @@ def _find_item_by_ident_in_entity(
         item = {
             "uid": todo_item.uid,
             "summary": todo_item.summary,
-            "status": todo_item.status.value if todo_item.status else None,
+            "status": _status_value(todo_item.status) if todo_item.status else None,
             "description": todo_item.description,
         }
         keys = _item_lookup_keys(item)
@@ -311,7 +318,7 @@ def _get_items_from_entity(hass: HomeAssistant, entity_id: str) -> list[dict[str
         {
             "uid": item.uid,
             "summary": item.summary,
-            "status": item.status.value if item.status else None,
+            "status": _status_value(item.status) if item.status else None,
             "description": item.description,
         }
         for item in todo_items
@@ -379,6 +386,7 @@ def _build_description_json(data: dict[str, Any]) -> str:
         "icon_color": data.get(ATTR_ICON_COLOR, ""),
         "text_color": data.get(ATTR_TEXT_COLOR, ""),
         "persistent": data.get(ATTR_PERSISTENT, False),
+        "hide_when_completed": data.get(ATTR_HIDE_WHEN_COMPLETED, False),
         "resolved_text": data.get(ATTR_RESOLVED_TEXT, ""),
         "cleanup_hours": data.get(ATTR_CLEANUP_HOURS, 0),
         "completed_at": data.get(ATTR_COMPLETED_AT, ""),
@@ -547,6 +555,7 @@ async def _handle_complete(call: ServiceCall) -> None:
                         ATTR_ICON_COLOR: data.get(ATTR_ICON_COLOR, ""),
                         ATTR_TEXT_COLOR: data.get(ATTR_TEXT_COLOR, ""),
                         ATTR_PERSISTENT: True,
+                        ATTR_HIDE_WHEN_COMPLETED: data.get(ATTR_HIDE_WHEN_COMPLETED, False),
                         ATTR_RESOLVED_TEXT: data.get(ATTR_RESOLVED_TEXT, ""),
                         ATTR_CLEANUP_HOURS: data.get(ATTR_CLEANUP_HOURS, 0),
                         ATTR_COMPLETED_AT: datetime.now(timezone.utc).isoformat(),
@@ -614,6 +623,11 @@ async def _handle_complete(call: ServiceCall) -> None:
                 ATTR_ICON_COLOR: parsed.get("icon_color", ""),
                 ATTR_TEXT_COLOR: parsed.get("text_color", ""),
                 ATTR_PERSISTENT: True,
+                ATTR_HIDE_WHEN_COMPLETED: (
+                    data.get(ATTR_HIDE_WHEN_COMPLETED)
+                    if ATTR_HIDE_WHEN_COMPLETED in data
+                    else parsed.get(ATTR_HIDE_WHEN_COMPLETED, False)
+                ),
                 ATTR_RESOLVED_TEXT: parsed.get("resolved_text", ""),
                 ATTR_CLEANUP_HOURS: parsed.get("cleanup_hours", 0),
                 ATTR_COMPLETED_AT: parsed.get("completed_at", ""),
@@ -687,6 +701,7 @@ def _normalize_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "text_color": data.get("text_color", ""),
                 "ident": data.get("ident") or _extract_item_title(item),
                 "persistent": data.get("persistent", False),
+                "hide_when_completed": data.get("hide_when_completed", False),
                 "resolved_text": data.get("resolved_text", ""),
                 "cleanup_hours": data.get("cleanup_hours", 0),
                 "completed_at": data.get("completed_at", ""),

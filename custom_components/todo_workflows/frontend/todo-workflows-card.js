@@ -375,7 +375,7 @@ class TodoWorkflowsCard extends HTMLElement {
         empty.textContent = "Keine Aufgaben";
         list.appendChild(empty);
       } else {
-        this._items.forEach((item) => {
+        this._items.filter((item) => !this._isHiddenCompleted(item)).forEach((item) => {
           list.appendChild(this._renderRow(item));
         });
       }
@@ -643,6 +643,7 @@ class TodoWorkflowsCard extends HTMLElement {
       item_id: item.id,
       title: item.title,
       persistent: Boolean(item.persistent),
+      hide_when_completed: Boolean(item.hide_when_completed),
     };
     delete payload.uid;
     const payloadKeys = Object.keys(payload);
@@ -664,6 +665,11 @@ class TodoWorkflowsCard extends HTMLElement {
   }
 
   _applyOptimisticCompletion(item) {
+    if (item.persistent && item.hide_when_completed) {
+      this._setItems(this._items.filter((entry) => !this._isSameItem(entry, item)));
+      return;
+    }
+
     if (item.persistent) {
       this._setItems(
         this._items.map((entry) => {
@@ -694,6 +700,10 @@ class TodoWorkflowsCard extends HTMLElement {
       return String(left.ident) === String(right.ident);
     }
     return String(left.title || "") === String(right.title || "");
+  }
+
+  _isHiddenCompleted(item) {
+    return Boolean(item?.hide_when_completed && item.status === "completed");
   }
 
   async _update(force = false) {

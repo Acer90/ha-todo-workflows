@@ -76,10 +76,11 @@ class TodoWorkflowsList(TodoListEntity):
 
     @staticmethod
     def _item_to_data(item: TodoItem) -> dict[str, Any]:
+        status = item.status
         return {
             "uid": item.uid,
             "summary": item.summary,
-            "status": item.status.value,
+            "status": status.value if hasattr(status, "value") else status,
             "due": item.due.isoformat() if item.due else None,
             "description": item.description,
         }

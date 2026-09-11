@@ -52,6 +52,10 @@ Wichtig:
 - ident ist der primare Schlussel fur Wiederfinden/Upsert.
 - Wenn ident fehlt, wird title als Fallback genutzt.
 - completed_at + cleanup_hours steuern Auto-Cleanup fur persistente completed Items.
+- `hide_when_completed` blendet persistente erledigte Items nur in der Card aus;
+  der Backend-Eintrag bleibt fur Status und Cleanup erhalten.
+- Statuswerte konnen je nach Home-Assistant-Servicepfad als `TodoItemStatus` oder
+  als String eintreffen; Persistenz und Ausgaben mussen beide Formen akzeptieren.
 
 ## 4) Services, Conditions und WebSocket
 
@@ -80,12 +84,18 @@ Verhalten:
   - laedt den Todo-Workflows-Config-Entry neu, einschliesslich der internen Todo-Liste und Lovelace-Resource-Registrierung
 - Die eigene Liste `todo.todo_workflows` ist die persistente Backend-Entity und fest vorgegeben. Card, Services, WebSocket und Condition kommunizieren ausschliesslich mit Todo Workflows und bieten keine Listenauswahl.
 - Die Liste setzt ihre Entity-ID explizit als `todo.todo_workflows`; ein eventuell aus einer frueheren Version abgeleiteter Registry-Name wird beim Setup auf diese ID migriert.
+- Beim Speichern werden Enum- und String-Status gleichermassen serialisiert; dadurch
+  bleibt `complete_item_v2` auch bei persistenten Items funktionsfaehig.
 - Der Config-Entry richtet zuerst die interne Todo-Entity ein und registriert erst danach Services, Frontend und Lovelace-Resource. Der WebSocket liefert bei einem kurzzeitig fehlenden Speicher eine leere Liste statt einen fehlgeschlagenen `todo.get_items`-Aufruf aus.
 - upsert_item:
   - sucht Item per ident/titelnahen Fallbacks
   - aktualisiert vorhandenes Item oder legt neues Item an
+  - akzeptiert `hide_when_completed`, damit persistente Items nach Abschluss nur
+    in der Card ausgeblendet werden
 - complete_item_v2:
   - bei persistent=true: markiert Item als completed und schreibt completed_at
+  - bei hide_when_completed=true: laesst das persistente Item gespeichert, blendet
+    es aber in der Card aus
   - sonst: entfernt Item aus der Liste
 - todo_workflows.has_ident:
   - pruft, ob ein Item mit ident existiert
@@ -148,6 +158,8 @@ Pflegepflicht:
 ## 7) Haufige Stolperfallen
 
 - Unterschiedliche Item-IDs (uid, id, item_id) nicht vereinheitlicht.
+- `TodoItem.status` nicht blind mit `.value` serialisieren; Service-Updates konnen
+  bereits den String `completed` oder `needs_action` liefern.
 - description enthalt kein valides JSON, daher immer defensiv parsen.
 - todo.get_items kann je nach HA-Version unterschiedlich verschachtelte Antwortstrukturen liefern.
 - Die aktuelle Todo-Service-Antwort ist nach Entity-ID verschachtelt (`response["todo.todo_workflows"]["items"]`); flache und Legacy-Formen bleiben ebenfalls unterstuetzt.
@@ -158,6 +170,8 @@ Pflegepflicht:
 - Lovelace Resources koennen im YAML-Modus nicht von der Integration persistiert angelegt werden.
 - Nach einem HACS-Update ist `todo_workflows.reload` erforderlich, damit der Resource-Eintrag seine neue `?v=`-Version erhaelt.
 - Card und Integration konnen asynchron unterschiedliche Datenstande sehen; post-action refresh ist daher gewollt.
+- `hide_when_completed` ist eine Darstellungsoption und darf nicht mit dem
+  persistenten Cleanup verwechselt werden.
 - Die Standardliste wird per Home-Assistant-Store persistiert; sie darf nicht durch fluchtigen Entity-State ersetzt werden.
 
 ## 8) Test-Checkliste fur Anderungen
@@ -174,6 +188,10 @@ Backend:
 - Das Event todo_workflows_items_updated wird nach Upsert und Complete ausgeloest.
 - Condition todo_workflows.has_ident liefert true bei vorhandenem ident.
 - Condition todo_workflows.has_ident respektiert optional completed=true/false.
+- Persistent completion mit einem String-Status (`completed`) speichert ohne
+  `AttributeError` und liefert den Eintrag anschliessend korrekt aus.
+- `complete_item_v2` mit `persistent: true` und `hide_when_completed: true`
+  speichert den erledigten Eintrag, zeigt ihn aber nicht mehr in der Card.
 
 Frontend:
 - Die Card-Resource erscheint nach dem Setup in Dashboard -> Ressourcen als `module` mit einer versionsierten URL, zum Beispiel `/todo_workflows_frontend/todo-workflows-card.js?v=1.0.7`.
