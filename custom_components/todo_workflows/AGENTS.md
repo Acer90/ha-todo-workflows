@@ -158,6 +158,9 @@ Pflegepflicht:
 ## 7) Haufige Stolperfallen
 
 - Unterschiedliche Item-IDs (uid, id, item_id) nicht vereinheitlicht.
+- Beim nativen `todo.update_item` ist die interne Todo-UID als `item` zu
+  uebergeben; `item_id` ist dort kein gueltiger Service-Key. `item_id` bleibt
+  nur ein akzeptierter Identifikator in den Todo-Workflows-Services.
 - `TodoItem.status` nicht blind mit `.value` serialisieren; Service-Updates konnen
   bereits den String `completed` oder `needs_action` liefern.
 - description enthalt kein valides JSON, daher immer defensiv parsen.
@@ -181,6 +184,8 @@ Backend:
 - Nach dem Einrichten des Config-Entries existiert `todo.todo_workflows`; neu angelegte Items bleiben nach einem Home-Assistant-Neustart erhalten.
 - upsert_item erstellt neues Item.
 - upsert_item aktualisiert vorhandenes Item per ident.
+- upsert_item aktualisiert vorhandenes Item auch bei einer nativen Todo-UID
+  ohne `item_id`-Servicefehler.
 - complete_item_v2 entfernt nicht-persistentes Item.
 - complete_item_v2 markiert persistentes Item als completed.
 - Cleanup entfernt fallige completed/persistent Items.

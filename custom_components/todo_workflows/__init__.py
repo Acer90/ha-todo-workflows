@@ -485,7 +485,7 @@ async def _handle_upsert(call: ServiceCall) -> None:
             await _call_todo_service(
                 hass,
                 "update_item",
-                {**service_data, "item_id": item_id, "status": "needs_action"},
+                {**service_data, "item": item_id, "status": "needs_action"},
             )
         else:
             existing_title = _extract_item_title(existing)
